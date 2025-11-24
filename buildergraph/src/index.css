@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-background text-text-primary font-sans antialiased;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading font-bold tracking-wide;
+  }
+}
+
+@layer components {
+
+  /* Button styles */
+  .btn {
+    @apply px-6 py-3 rounded-lg font-medium transition-all duration-200;
+  }
+
+  .btn-primary {
+    @apply bg-gradient-to-r from-primary to-accent text-white hover:opacity-90;
+  }
+
+  .btn-secondary {
+    @apply bg-background-card text-text-primary border border-primary hover:bg-primary/10;
+  }
+
+  /* Card styles */
+  .card {
+    @apply bg-background-card rounded-xl p-6 border border-white/5;
+  }
+
+  .card-hover {
+    @apply transition-all duration-200 hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/20;
+  }
+}
