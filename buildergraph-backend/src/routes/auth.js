@@ -217,14 +217,30 @@ router.get('/logout', (req, res) => {
  * Check authentication status
  */
 router.get('/status', (req, res) => {
+  if (!req.isAuthenticated()) {
+    return res.json({
+      authenticated: false,
+      user: null
+    });
+  }
+
+  // Return full user profile data
+  const user = {
+    id: req.user.id,
+    username: req.user.username,
+    full_name: req.user.full_name,
+    email: req.user.email,
+    avatar_url: req.user.avatar_url,
+    location: req.user.location,
+    bio: req.user.bio,
+    github_username: req.user.github_username,
+    ual: req.user.ual,
+    publish_status: req.user.publish_status
+  };
+
   res.json({
-    authenticated: req.isAuthenticated(),
-    user: req.isAuthenticated() ? {
-      id: req.user.id,
-      username: req.user.username,
-      full_name: req.user.full_name,
-      avatar_url: req.user.avatar_url
-    } : null
+    authenticated: true,
+    user: user
   });
 });
 

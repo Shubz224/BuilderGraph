@@ -245,7 +245,7 @@ router.get('/:identifier', (req, res) => {
                 languages: profile.languages ? JSON.parse(profile.languages) : null,
                 specializations: profile.specializations ? JSON.parse(profile.specializations) : null,
                 github_repos: profile.github_repos ? JSON.parse(profile.github_repos) : null,
-                explorerUrl: profile.ual ? `https://dkg.origintrail.io/explore?ual=${encodeURIComponent(profile.ual)}` : null
+                explorerUrl: profile.ual ? `https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(profile.ual)}` : null
             }
         });
 
@@ -275,7 +275,7 @@ router.get('/', (req, res) => {
                 languages: p.languages ? JSON.parse(p.languages) : null,
                 specializations: p.specializations ? JSON.parse(p.specializations) : null,
                 github_repos: p.github_repos ? JSON.parse(p.github_repos) : null,
-                explorerUrl: p.ual ? `https://dkg.origintrail.io/explore?ual=${encodeURIComponent(p.ual)}` : null
+                explorerUrl: p.ual ? `https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(p.ual)}` : null
             }))
         });
 
@@ -311,7 +311,9 @@ router.get('/username/:username', (req, res) => {
                 skills: profile.skills ? JSON.parse(profile.skills) : [],
                 languages: profile.languages ? JSON.parse(profile.languages) : [],
                 specializations: profile.specializations ? JSON.parse(profile.specializations) : [],
-                githubRepos: profile.github_repos ? JSON.parse(profile.github_repos) : [],
+                github_repos: profile.github_repos ? JSON.parse(profile.github_repos) : [],
+                ual: profile.ual || null,
+                dataset_root: profile.dataset_root || null,
                 explorerUrl: profile.ual ? `https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(profile.ual)}` : null
             }
         });
