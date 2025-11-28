@@ -217,7 +217,7 @@ const Dashboard: React.FC = () => {
     },
     {
       label: 'SKILLS',
-      value: Math.max(profile.skills?.length || 0, programmingLanguages.length).toString(),
+      value: Math.max(programmingLanguages.length).toString(),
       // change: `${profile.experience}`,
       icon: <IoCodeSlash className="text-3xl" />,
       gradient: 'from-pink-500 to-rose-600'
