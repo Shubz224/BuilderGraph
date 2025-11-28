@@ -148,6 +148,72 @@ class ApiService {
         }
     }
 
+    async getDeveloperFullData(username: string): Promise<{ success: boolean; username?: string; fullName?: string; projects?: any[]; error?: string }> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/profiles/${username}/full-data`);
+            const result = await response.json();
+
+            if (!response.ok) {
+                return result as ApiError;
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Get developer full data error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to get developer full data',
+            };
+        }
+    }
+
+    /**
+     * Grant access after payment
+     */
+    async grantProfileAccess(payerWalletAddress: string, profileUsername: string, transactionHash: string, amountPaid: string): Promise<{ success: boolean; error?: string }> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/payments/grant-access`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    payerWalletAddress,
+                    profileUsername,
+                    transactionHash,
+                    amountPaid
+                }),
+            });
+
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            console.error('Grant access error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to grant access',
+            };
+        }
+    }
+
+    /**
+     * Check if wallet has access to profile
+     */
+    async checkProfileAccess(walletAddress: string, username: string): Promise<{ success: boolean; hasAccess: boolean; error?: string }> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/payments/check-access/${username}?walletAddress=${encodeURIComponent(walletAddress)}`);
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            console.error('Check access error:', error);
+            return {
+                success: false,
+                hasAccess: false,
+                error: error instanceof Error ? error.message : 'Failed to check access',
+            };
+        }
+    }
+
     /**
      * Create a new project
      */
@@ -350,7 +416,7 @@ class ApiService {
         } catch (error) {
             if (timeoutId) clearTimeout(timeoutId);
             console.error('Analyze repository error:', error);
-            
+
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to analyze repository',
@@ -766,18 +832,18 @@ class ApiService {
     /**
      * Get aggregated project data (scores and programming languages) from ai_analysis table
      */
-    async getAggregatedProjectData(ownerUAL: string): Promise<{ 
-        success: boolean; 
-        totalScore?: number; 
+    async getAggregatedProjectData(ownerUAL: string): Promise<{
+        success: boolean;
+        totalScore?: number;
         scoreBreakdown?: {
             commitScore: number;
             structureScore: number;
             readmeScore: number;
             metadataScore: number;
         };
-        projectCount?: number; 
-        programmingLanguages?: string[]; 
-        error?: string 
+        projectCount?: number;
+        programmingLanguages?: string[];
+        error?: string
     }> {
         try {
             const encodedUAL = encodeURIComponent(ownerUAL);

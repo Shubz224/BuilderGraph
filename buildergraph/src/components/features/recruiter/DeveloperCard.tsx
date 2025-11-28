@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
+import { useAccount, useSendTransaction, useWaitForTransactionReceipt } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { parseEther } from 'viem';
 import { Card } from '../../ui/Card';
 import { Button } from '../../ui/Button';
-import { IoLocationSharp, IoMail, IoLockOpen, IoCheckmarkCircle, IoLogoGithub } from 'react-icons/io5';
+import { IoLocationSharp, IoLockOpen, IoCheckmarkCircle, IoLogoGithub } from 'react-icons/io5';
+import { api } from '../../../services/api';
 
 interface DeveloperCardProps {
     id: string;
@@ -30,19 +34,60 @@ const DeveloperCard: React.FC<DeveloperCardProps> = ({
     matchScore,
 }) => {
     const [isContactUnlocked, setIsContactUnlocked] = useState(initialUnlocked);
-    const [isUnlocking, setIsUnlocking] = useState(false);
+    const { address, isConnected } = useAccount();
+    const { openConnectModal } = useConnectModal();
+    const { data: hash, sendTransaction, isPending: isSending, isError, error } = useSendTransaction();
+    const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
+        hash,
+    });
 
-    const handleUnlockContact = () => {
-        setIsUnlocking(true);
+    const PAYMENT_ADDRESS = '0x947c1f94b46b6c76b31403a2f8a1ea801510af21';
+    const PAYMENT_AMOUNT = '0.005'; // 0.005 ETH
 
-        // Simulate x402 payment
-        setTimeout(() => {
-            console.log('Payment processed: $0.50 via x402');
-            setIsContactUnlocked(true);
-            setIsUnlocking(false);
-            alert('Contact unlocked! Email: ' + username + '@example.com');
-        }, 1500);
+    const handleUnlockContact = async () => {
+        if (!isConnected) {
+            // Open RainbowKit modal for wallet connection
+            if (openConnectModal) {
+                openConnectModal();
+            }
+            return;
+        }
+
+        try {
+            // Send payment
+            sendTransaction({
+                to: PAYMENT_ADDRESS,
+                value: parseEther(PAYMENT_AMOUNT),
+            });
+        } catch (err) {
+            console.error('Payment error:', err);
+        }
     };
+
+    // Redirect to full data page after successful payment
+    React.useEffect(() => {
+        if (isSuccess && hash && address) {
+            // Record payment in backend
+            api.grantProfileAccess(
+                address,
+                username,
+                hash,
+                PAYMENT_AMOUNT
+            ).then(() => {
+                setIsContactUnlocked(true);
+                // Redirect after recording
+                setTimeout(() => {
+                    window.location.href = `/${username}/full-data`;
+                }, 1000);
+            }).catch(err => {
+                console.error('Failed to record payment:', err);
+                // Still redirect even if recording fails
+                setTimeout(() => {
+                    window.location.href = `/${username}/full-data`;
+                }, 1000);
+            });
+        }
+    }, [isSuccess, hash, address, username, PAYMENT_AMOUNT]);
 
     return (
         <Card hoverable className="h-full flex flex-col md:flex-row gap-6 p-6 transition-all duration-300 hover:border-primary/50 group">
@@ -123,9 +168,14 @@ const DeveloperCard: React.FC<DeveloperCardProps> = ({
                     </Button>
 
                     {isContactUnlocked ? (
-                        <Button variant="primary" size="sm" className="flex-1 bg-emerald-600 hover:bg-emerald-700 border-emerald-500">
-                            <IoMail className="mr-2" />
-                            Send Message
+                        <Button
+                            variant="primary"
+                            size="sm"
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 border-emerald-500"
+                            onClick={() => window.location.href = `/${username}/full-data`}
+                        >
+                            {/* <IoMail className="mr-2" /> */}
+                            SEE FULL DATA
                         </Button>
                     ) : (
                         <Button
@@ -133,11 +183,24 @@ const DeveloperCard: React.FC<DeveloperCardProps> = ({
                             size="sm"
                             className="flex-1"
                             onClick={handleUnlockContact}
-                            disabled={isUnlocking}
+                            disabled={isSending || isConfirming}
                         >
                             <IoLockOpen className="mr-2" />
-                            {isUnlocking ? 'Processing...' : 'Unlock Contact ($0.50)'}
+                            {!isConnected
+                                ? 'Connect Wallet'
+                                : isSending
+                                    ? 'Sending...'
+                                    : isConfirming
+                                        ? 'Confirming...'
+                                        : isSuccess
+                                            ? 'Unlocked! Redirecting...'
+                                            : `Unlock Full Profile (${PAYMENT_AMOUNT} ETH)`}
                         </Button>
+                    )}
+                    {isError && (
+                        <p className="text-red-500 text-xs mt-2">
+                            Error: {error?.message || 'Transaction failed'}
+                        </p>
                     )}
                 </div>
             </div>
