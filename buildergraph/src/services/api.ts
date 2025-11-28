@@ -18,6 +18,9 @@ import type {
     EndorsementStatusResponse,
     EndorsementsResponse,
     GivenEndorsementsResponse,
+    AuthStatusResponse,
+    AuthUserResponse,
+    LogoutResponse,
     ApiError,
 } from '../types/api.types';
 
@@ -513,6 +516,83 @@ class ApiService {
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to withdraw endorsement',
+            };
+        }
+    }
+
+    /**
+     * GitHub OAuth - Initiate login
+     * Redirects to GitHub OAuth page
+     */
+    loginWithGitHub(): void {
+        window.location.href = `${API_BASE_URL}/auth/github`;
+    }
+
+    /**
+     * Get current authenticated user
+     */
+    async getCurrentUser(): Promise<AuthUserResponse | ApiError> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/user`, {
+                credentials: 'include', // Important for session cookies
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                return result as ApiError;
+            }
+
+            return result as AuthUserResponse;
+        } catch (error) {
+            console.error('Get current user error:', error);
+            return {
+                success: false,
+                authenticated: false,
+                error: error instanceof Error ? error.message : 'Failed to get current user',
+            };
+        }
+    }
+
+    /**
+     * Logout current user
+     */
+    async logout(): Promise<LogoutResponse | ApiError> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/logout`, {
+                credentials: 'include',
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                return result as ApiError;
+            }
+
+            return result as LogoutResponse;
+        } catch (error) {
+            console.error('Logout error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to logout',
+            };
+        }
+    }
+
+    /**
+     * Check authentication status
+     */
+    async checkAuthStatus(): Promise<AuthStatusResponse> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/status`, {
+                credentials: 'include',
+            });
+            const result = await response.json();
+
+            return result as AuthStatusResponse;
+        } catch (error) {
+            console.error('Check auth status error:', error);
+            return {
+                authenticated: false,
+                user: null,
             };
         }
     }
