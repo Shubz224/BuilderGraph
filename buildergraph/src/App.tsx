@@ -13,10 +13,13 @@ import PublicProfile from './pages/PublicProfile';
 import RecruiterDashboard from './pages/RecruiterDashboard';
 import GitHubCallback from './pages/GitHubCallback';
 
+import { GlobalProgressBar } from './components/ui/GlobalProgressBar';
+
 const App: React.FC = () => {
   return (
     <BrowserRouter>
       <div className="min-h-screen bg-background flex flex-col">
+        <GlobalProgressBar />
         <Navbar />
         <main className="flex-grow">
           <Routes>
