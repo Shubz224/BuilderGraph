@@ -4,10 +4,10 @@ import { Container } from '../../ui/Container';
 import { SearchBar } from './SearchBar';
 import { FilterSidebar } from './FilterSidebar';
 import { DeveloperCard } from './DeveloperCard';
-import { IoPeople, IoShieldCheckmark, IoTrendingUp, IoFlash } from 'react-icons/io5';
+import { IoPeople, IoShieldCheckmark, IoFlash } from 'react-icons/io5';
 import { api } from '../../../services/api';
 import type { Profile } from '../../../types/api.types';
-import { getReputationScore } from '../../../utils/reputation';
+
 
 const RecruiterDashboard: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -173,11 +173,12 @@ const RecruiterDashboard: React.FC = () => {
                                             id={dev.id.toString()}
                                             name={dev.full_name}
                                             username={dev.username}
-                                            title={`${dev.experience || 0}+ years experience`}
+                                            // title={`${dev.experience || 0}+ years experience`}
+                                            title={``}
                                             location={dev.location}
                                             skills={dev.skills || []}
-                                            reputationScore={getReputationScore(dev)}
-                                            avatar={`https://api.dicebear.com/7.x/avataaars/svg?seed=${dev.username}`}
+                                            reputationScore={dev.reputation_score || 0}
+                                            avatar={dev.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${dev.username}`}
                                             isContactUnlocked={false}
                                             verified={!!dev.ual}
                                             matchScore={Math.min(70 + (dev.skills?.length || 0) * 3, 99)}

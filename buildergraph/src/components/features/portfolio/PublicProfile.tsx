@@ -8,7 +8,7 @@ import { StatsSection } from './StatsSection';
 import { ShareSection } from './ShareSection';
 import { api } from '../../../services/api';
 import type { Profile, Project } from '../../../types/api.types';
-import { getReputationScore } from '../../../utils/reputation';
+
 
 const PublicProfile: React.FC = () => {
     const { username } = useParams<{ username: string }>();
@@ -29,7 +29,7 @@ const PublicProfile: React.FC = () => {
                 // Get profile by username
                 const response = await api.getProfileByUsername(username);
                 console.log('Profile response:', response);
-                
+
                 if (response.success && response.profile) {
                     console.log('Profile loaded successfully:', response.profile);
                     setProfile(response.profile);
@@ -136,6 +136,20 @@ const PublicProfile: React.FC = () => {
             }
         }).filter((p): p is NonNullable<typeof p> => p !== null);
 
+        // Derive programming languages from projects
+        const programmingLanguages = Array.from(new Set(
+            projects.flatMap(p => {
+                try {
+                    const stack = p.tech_stack;
+                    if (Array.isArray(stack)) return stack;
+                    if (typeof stack === 'string') return JSON.parse(stack);
+                    return [];
+                } catch {
+                    return [];
+                }
+            })
+        )).slice(0, 5); // Top 5 languages
+
         return (
             <div className="min-h-screen pb-20">
                 {/* Hero */}
@@ -143,10 +157,10 @@ const PublicProfile: React.FC = () => {
                     <Container maxWidth="2xl">
                         <HeroSection
                             name={profile.full_name || profile.username || 'Unknown User'}
-                            title={`${profile.experience || 0}+ years experience • ${(profile.skills || []).length} skills`}
+                            title={`Skills :${programmingLanguages.length || 'No languages'}`}
                             location={profile.location || undefined}
                             bio={profile.bio || 'No bio provided'}
-                            reputationScore={getReputationScore(profile)}
+                            reputationScore={profile.reputation_score || 0}
                             avatar={profile.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${profile.username}`}
                             ual={profile.ual || undefined}
                             explorerUrl={profile.explorerUrl || undefined}
