@@ -5,7 +5,7 @@ import { MapPin, BadgeCheck, ShieldCheck, Github, Linkedin, Twitter, Copy, Check
 interface HeroSectionProps {
     name: string;
     title: string;
-    location: string;
+    location?: string | null;
     bio: string;
     reputationScore: number;
     avatar: string;
@@ -63,10 +63,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                 <p className="text-2xl text-accent font-medium mb-4">
                     {title}
                 </p>
-                <div className="flex items-center justify-center gap-2 text-text-secondary mb-8">
-                    <MapPin className="w-4 h-4" />
-                    <span>{location}</span>
-                </div>
+                {location && (
+                    <div className="flex items-center justify-center gap-2 text-text-secondary mb-8">
+                        <MapPin className="w-4 h-4" />
+                        <span>{location}</span>
+                    </div>
+                )}
 
                 {/* Bio */}
                 <p className="text-lg text-text-secondary leading-relaxed mb-10 max-w-2xl mx-auto">

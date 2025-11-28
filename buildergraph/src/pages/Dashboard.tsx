@@ -13,7 +13,6 @@ import {
   IoTrendingUp,
   IoPeople,
   IoBulb,
-  IoSave,
   IoRocket,
   IoStar,
   IoEye,
@@ -23,7 +22,6 @@ import {
 import { api } from '../services/api';
 import { userStore } from '../stores/userStore';
 import type { Profile, Project } from '../types/api.types';
-import { getReputationScore } from '../utils/reputation';
 
 // Helper function to normalize tech_stack to always be an array
 const normalizeTechStack = (techStack: any): string[] => {
@@ -46,6 +44,19 @@ const Dashboard: React.FC = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [totalProjectScore, setTotalProjectScore] = useState<number>(0);
+  const [scoreBreakdown, setScoreBreakdown] = useState<{
+    commitScore: number;
+    structureScore: number;
+    readmeScore: number;
+    metadataScore: number;
+  }>({
+    commitScore: 0,
+    structureScore: 0,
+    readmeScore: 0,
+    metadataScore: 0
+  });
+  const [programmingLanguages, setProgrammingLanguages] = useState<string[]>([]);
 
   useEffect(() => {
     const loadDashboardData = async () => {
@@ -77,6 +88,19 @@ const Dashboard: React.FC = () => {
         if (projectsResponse.success) {
           setProjects(projectsResponse.projects);
         }
+
+        // Load aggregated project data (scores and programming languages)
+        const aggregatedResponse = await api.getAggregatedProjectData(userUAL);
+        if (aggregatedResponse.success) {
+          setTotalProjectScore(aggregatedResponse.totalScore || 0);
+          setScoreBreakdown(aggregatedResponse.scoreBreakdown || {
+            commitScore: 0,
+            structureScore: 0,
+            readmeScore: 0,
+            metadataScore: 0
+          });
+          setProgrammingLanguages(aggregatedResponse.programmingLanguages || []);
+        }
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
       } finally {
@@ -99,12 +123,12 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Mock data
+  // Calculate breakdown items from aggregated project scores
   const breakdownItems = [
-    { label: 'Code Quality', value: 35, icon: <IoCodeSlash className="text-2xl" /> },
-    { label: 'Consistency', value: 25, icon: <IoTrendingUp className="text-2xl" /> },
-    { label: 'Peer Endorsements', value: 20, icon: <IoPeople className="text-2xl" /> },
-    { label: 'Project Diversity', value: 20, icon: <IoBulb className="text-2xl" /> },
+    { label: 'Commit Score', value: scoreBreakdown.commitScore, icon: <IoCodeSlash className="text-2xl" /> },
+    { label: 'Structure Score', value: scoreBreakdown.structureScore, icon: <IoTrendingUp className="text-2xl" /> },
+    { label: 'Readme Score', value: scoreBreakdown.readmeScore, icon: <IoPeople className="text-2xl" /> },
+    { label: 'Metadata Score', value: scoreBreakdown.metadataScore, icon: <IoBulb className="text-2xl" /> },
   ];
 
   const activities = [
@@ -152,12 +176,21 @@ const Dashboard: React.FC = () => {
     },
   ];
 
+
+
+  // Combine profile skills with programming languages from projects
+  const allSkills = new Set([
+    ...(profile.skills || []),
+    ...programmingLanguages
+  ]);
+  const uniqueSkills = Array.from(allSkills);
+
   const profileFields = [
     profile.full_name,
     profile.email,
     profile.location,
     profile.bio,
-    profile.skills?.length || 0,
+    uniqueSkills.length || 0,
     profile.github_username,
   ];
   const completedFields = profileFields.filter(Boolean).length;
@@ -165,21 +198,16 @@ const Dashboard: React.FC = () => {
 
   const completionItems = [
     { name: 'Complete basic profile', completed: true },
-    { name: 'Add skills', completed: (profile.skills?.length || 0) > 0 },
+    { name: 'Add skills', completed: uniqueSkills.length > 0 },
     { name: 'Connect GitHub', completed: !!profile.github_username },
     { name: 'Add at least 3 projects', completed: projects.length >= 3 },
     { name: 'Published to DKG', completed: !!profile.ual },
   ];
 
+  console.log(profile.skills, "skills");
+  console.log(programmingLanguages, "languages");
   // Stats for hero section
   const heroStats = [
-    {
-      label: 'TOTAL REPOS',
-      value: (profile.github_repos?.length || 0).toString(),
-      change: `+${projects.length}`,
-      icon: <IoSave className="text-3xl" />,
-      gradient: 'from-violet-500 to-purple-600'
-    },
     {
       label: 'ACTIVE PROJECTS',
       value: projects.length.toString(),
@@ -189,8 +217,8 @@ const Dashboard: React.FC = () => {
     },
     {
       label: 'SKILLS',
-      value: (profile.skills?.length || 0).toString(),
-      change: `${profile.experience || 0}y exp`,
+      value: Math.max(profile.skills?.length || 0, programmingLanguages.length).toString(),
+      // change: `${profile.experience}`,
       icon: <IoCodeSlash className="text-3xl" />,
       gradient: 'from-pink-500 to-rose-600'
     },
@@ -224,7 +252,7 @@ const Dashboard: React.FC = () => {
             </p>
             {profile.ual && (
               <p className="text-text-muted text-sm mt-1 font-mono">
-                UAL: {profile.ual.slice(0, 60)}...
+                UAL: {profile.ual}
               </p>
             )}
           </div>
@@ -272,7 +300,7 @@ const Dashboard: React.FC = () => {
             {/* Reputation Score */}
             <div className="lg:col-span-1">
               <ReputationScore
-                score={getReputationScore(profile)}
+                score={totalProjectScore}
                 trend="up"
               />
             </div>

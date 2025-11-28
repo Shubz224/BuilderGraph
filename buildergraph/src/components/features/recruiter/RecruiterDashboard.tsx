@@ -70,7 +70,6 @@ const RecruiterDashboard: React.FC = () => {
         { label: 'Total Developers', value: developers.length.toString(), icon: <IoPeople />, change: `${developers.filter(d => d.ual).length} verified`, color: 'text-blue-400' },
         { label: 'On DKG', value: developers.filter(d => d.ual).length.toString(), icon: <IoShieldCheckmark />, change: 'Published', color: 'text-emerald-400' },
         { label: 'Total Projects', value: '–', icon: <IoFlash />, change: 'Linked', color: 'text-amber-400' },
-        { label: 'Avg Experience', value: developers.length > 0 ? Math.round(developers.reduce((sum, d) => sum + (d.experience || 0), 0) / developers.length) + 'y' : '0y', icon: <IoTrendingUp />, change: 'Average', color: 'text-purple-400' },
     ];
 
     if (loading) {

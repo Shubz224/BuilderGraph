@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { api } from '../../../services/api';
 import { userStore } from '../../../stores/userStore';
-import { DKGPublishingLoader } from '../../ui/DKGPublishingLoader';
-import { SuccessCelebration } from '../../ui/SuccessCelebration';
+import { publishingStore } from '../../../stores/publishingStore';
 import type { GitHubRepository } from '../../../types/api.types';
 
 interface GitHubRepoImportModalProps {
@@ -18,13 +18,10 @@ const GitHubRepoImportModal: React.FC<GitHubRepoImportModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const navigate = useNavigate();
   const [repoUrl, setRepoUrl] = useState('');
   const [isImporting, setIsImporting] = useState(false);
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishSuccess, setPublishSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [projectUAL, setProjectUAL] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
   const [availableRepos, setAvailableRepos] = useState<GitHubRepository[]>([]);
   const [isLoadingRepos, setIsLoadingRepos] = useState(false);
   const [reposError, setReposError] = useState<string | null>(null);
@@ -102,14 +99,55 @@ const GitHubRepoImportModal: React.FC<GitHubRepoImportModalProps> = ({
 
     setIsImporting(true);
     setError(null);
-    setProgress(10);
 
     try {
-      // Call import API
-      console.log('📦 Importing repository:', repoUrl);
+      console.log('📦 Starting repository import process:', repoUrl);
+
+      // Step 1: Scrape repository data
+      console.log('🔍 Step 1: Scraping repository data...');
+      const scrapeResponse = await api.scrapeGitHubRepository(repoUrl.trim(), ownerUAL);
+
+      if (!scrapeResponse.success) {
+        throw new Error(scrapeResponse.error || 'Failed to scrape repository');
+      }
+
+      console.log('✅ Repository data scraped:', {
+        files: scrapeResponse.data?.fileStructure?.totalFiles,
+        commits: scrapeResponse.data?.commitHistory?.totalCommits,
+        readmeLength: scrapeResponse.data?.readme?.length
+      });
+
+      // Step 2: Analyze with AI (optional - fallback if fails)
+      let aiAnalysis = null;
+      console.log('🤖 Step 2: Analyzing repository with AI...');
+      try {
+        const analysisResponse = await api.analyzeRepository(scrapeResponse.data, ownerUAL);
+
+        if (analysisResponse.success) {
+          console.log('✅ AI Analysis complete:', {
+            score: analysisResponse.score,
+            summary: analysisResponse.analysis_summary
+          });
+          aiAnalysis = {
+            json_ld: analysisResponse.json_ld,
+            score: analysisResponse.score,
+            scoreBreakdown: analysisResponse.scoreBreakdown,
+            analysis_summary: analysisResponse.analysis_summary
+          };
+        } else {
+          console.warn('⚠️ AI Analysis failed, continuing with standard import:', analysisResponse.error);
+        }
+      } catch (err) {
+        console.warn('⚠️ AI Analysis error, continuing with standard import:', err);
+        // Continue without AI analysis
+      }
+
+      // Step 3: Import with AI-generated JSON-LD (if available) or standard import
+      console.log('📤 Step 3: Importing repository...');
       const importResponse = await api.importGitHubProject({
         repoUrl: repoUrl.trim(),
         ownerUAL: ownerUAL,
+        ...(aiAnalysis && { aiAnalysis })
       });
 
       if (!importResponse.success) {
@@ -117,61 +155,33 @@ const GitHubRepoImportModal: React.FC<GitHubRepoImportModalProps> = ({
         throw new Error(errorMsg);
       }
 
-      setProgress(30);
-      setIsImporting(false);
-      setIsPublishing(true);
-
       console.log('✅ Import started:', importResponse);
 
-      // Wait for publishing to complete with progress updates
-      const finalStatus = await api.waitForProjectPublishing(
-        importResponse.operationId,
-        (status) => {
-          console.log('📊 Status update:', status);
-          setProgress((prev) => Math.min(prev + 10, 90));
-        }
-      );
+      // Start background publishing
+      // Extract repo name from URL for display
+      const repoName = repoUrl.split('/').pop() || 'GitHub Project';
+      publishingStore.startPublishing('project', repoName);
+      publishingStore.monitorProjectPublishing(importResponse.operationId);
 
-      if (!finalStatus.success || finalStatus.status === 'failed') {
-        throw new Error(finalStatus.error || 'Publishing failed');
+      setIsImporting(false);
+      handleClose();
+
+      // Navigate to projects page
+      navigate('/dashboard/projects');
+
+      if (onSuccess) {
+        onSuccess();
       }
 
-      setProgress(100);
-
-      console.log('🎉 Project imported and published successfully!', finalStatus);
-
-      // Save project UAL
-      if (finalStatus.ual) {
-        setProjectUAL(finalStatus.ual);
-      }
-
-      // Show success celebration
-      setIsPublishing(false);
-      setPublishSuccess(true);
     } catch (err) {
       console.error('❌ Import error:', err);
       setIsImporting(false);
-      setIsPublishing(false);
       setError(err instanceof Error ? err.message : 'Failed to import repository');
     }
   };
 
-  const handleCelebrationComplete = () => {
-    setPublishSuccess(false);
-    setRepoUrl('');
-    setProgress(0);
-    setSelectedRepoId('');
-    setAvailableRepos([]);
-    setHasFetchedRepos(false);
-    setReposError(null);
-    onClose();
-    if (onSuccess) {
-      onSuccess();
-    }
-  };
-
   const handleClose = () => {
-    if (!isImporting && !isPublishing) {
+    if (!isImporting) {
       setRepoUrl('');
       setError(null);
       setSelectedRepoId('');
@@ -183,24 +193,6 @@ const GitHubRepoImportModal: React.FC<GitHubRepoImportModalProps> = ({
   };
 
   if (!isOpen) return null;
-
-  // Show publishing loader
-  if (isPublishing) {
-    return <DKGPublishingLoader message="Publishing imported project to DKG" progress={progress} />;
-  }
-
-  // Show success celebration
-  if (publishSuccess && projectUAL) {
-    return (
-      <SuccessCelebration
-        title="Project Imported!"
-        message="Your GitHub project has been imported and published to the DKG!"
-        ual={projectUAL}
-        onComplete={handleCelebrationComplete}
-        autoRedirectSeconds={5}
-      />
-    );
-  }
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -361,4 +353,3 @@ const GitHubRepoImportModal: React.FC<GitHubRepoImportModalProps> = ({
 };
 
 export { GitHubRepoImportModal };
-

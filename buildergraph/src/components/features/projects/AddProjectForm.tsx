@@ -7,10 +7,9 @@ import { Container } from '../../ui/Container';
 import { Input } from '../../ui/Input';
 import { Button } from '../../ui/Button';
 import { Card } from '../../ui/Card';
-import { DKGPublishingLoader } from '../../ui/DKGPublishingLoader';
-import { SuccessCelebration } from '../../ui/SuccessCelebration';
 import { api } from '../../../services/api';
 import { userStore } from '../../../stores/userStore';
+import { publishingStore } from '../../../stores/publishingStore';
 import type { ProjectFormData } from '../../../types/api.types';
 
 const addProjectSchema = z.object({
@@ -27,18 +26,12 @@ type AddProjectFormInputs = z.infer<typeof addProjectSchema>;
 const AddProjectForm: React.FC = () => {
   const navigate = useNavigate();
   const [ownerUAL, setOwnerUAL] = useState<string | null>(null);
-
-  // Publishing states
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishSuccess, setPublishSuccess] = useState(false);
-  const [publishError, setPublishError] = useState<string | null>(null);
-  const [projectUAL, setProjectUAL] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
-    formState: { errors },
+    formState: { errors, isSubmitting },
   } = useForm<AddProjectFormInputs>({
     resolver: zodResolver(addProjectSchema),
   });
@@ -62,9 +55,7 @@ const AddProjectForm: React.FC = () => {
       return;
     }
 
-    setIsPublishing(true);
-    setPublishError(null);
-    setProgress(10);
+    setSubmitError(null);
 
     try {
       // Prepare project data
@@ -78,7 +69,6 @@ const AddProjectForm: React.FC = () => {
       };
 
       console.log('📤 Submitting project:', projectData);
-      console.log('👤 Owner UAL:', ownerUAL);
 
       // Call API to create project
       const createResponse = await api.createProject(projectData, ownerUAL);
@@ -88,102 +78,20 @@ const AddProjectForm: React.FC = () => {
         throw new Error(errorMsg);
       }
 
-      setProgress(30);
-
       console.log('✅ Project creation started:', createResponse);
 
-      // Wait for publishing to complete with progress updates
-      const finalStatus = await api.waitForProjectPublishing(
-        createResponse.operationId,
-        (status) => {
-          console.log('📊 Status update:', status);
-          setProgress((prev) => Math.min(prev + 10, 90));
-        }
-      );
+      // Start background publishing
+      publishingStore.startPublishing('project', data.name);
+      publishingStore.monitorProjectPublishing(createResponse.operationId);
 
-      if (!finalStatus.success || finalStatus.status === 'failed') {
-        throw new Error(finalStatus.error || 'Publishing failed');
-      }
+      // Navigate to projects page immediately
+      navigate('/dashboard/projects');
 
-      setProgress(100);
-
-      console.log('🎉 Project published successfully!', finalStatus);
-
-      // Save project UAL
-      if (finalStatus.ual) {
-        setProjectUAL(finalStatus.ual);
-      }
-
-      // Show success celebration
-      setIsPublishing(false);
-      setPublishSuccess(true);
     } catch (error) {
       console.error('❌ Project creation error:', error);
-      setIsPublishing(false);
-      setPublishError(error instanceof Error ? error.message : 'Failed to create project');
+      setSubmitError(error instanceof Error ? error.message : 'Failed to create project');
     }
   };
-
-  const handleCelebrationComplete = () => {
-    // Navigate to projects page
-    navigate('/dashboard/projects');
-  };
-
-  const handleRetry = () => {
-    setPublishError(null);
-    setProgress(0);
-  };
-
-  // Show loading screen while publishing
-  if (isPublishing) {
-    return <DKGPublishingLoader message="Publishing your project to DKG" progress={progress} />;
-  }
-
-  // Show success celebration
-  if (publishSuccess && projectUAL) {
-    return (
-      <SuccessCelebration
-        title="Project Published!"
-        message="Your project is now on the Decentralized Knowledge Graph!"
-        ual={projectUAL}
-        onComplete={handleCelebrationComplete}
-        autoRedirectSeconds={5}
-      />
-    );
-  }
-
-  // Show error state
-  if (publishError) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center px-4">
-        <Container maxWidth="md">
-          <div className="bg-background-card rounded-xl p-8 border border-red-500/20 text-center space-y-6">
-            <div className="w-16 h-16 mx-auto rounded-full bg-red-500/20 flex items-center justify-center">
-              <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-text-primary">Publishing Failed</h2>
-            <p className="text-text-secondary">{publishError}</p>
-            <div className="flex gap-4 justify-center">
-              <button
-                onClick={() => navigate('/dashboard/projects')}
-                className="px-6 py-3 bg-background-elevated text-text-primary rounded-xl hover:bg-background-elevated/80 transition-colors"
-              >
-                ← Go Back
-              </button>
-              <button
-                onClick={handleRetry}
-                className="px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary/80 transition-colors"
-              >
-                Try Again
-              </button>
-            </div>
-          </div>
-        </Container>
-      </div>
-    );
-  }
 
   // Don't render form if no owner UAL
   if (!ownerUAL) {
@@ -295,9 +203,21 @@ const AddProjectForm: React.FC = () => {
               />
             </div>
 
+            {/* Error Message */}
+            {submitError && (
+              <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm text-center">
+                {submitError}
+              </div>
+            )}
+
             {/* Submit Button */}
-            <Button type="submit" size="lg" className="w-full">
-              Publish Project to DKG ✓
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? 'Starting Publishing...' : 'Publish Project to DKG ✓'}
             </Button>
           </Card>
         </form>

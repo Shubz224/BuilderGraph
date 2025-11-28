@@ -131,6 +131,12 @@ export interface ImportGitHubProjectData {
     repoUrl: string;
     ownerUAL: string;
     accessToken?: string;
+    aiAnalysis?: {
+        json_ld?: any;
+        score?: number;
+        scoreBreakdown?: any;
+        analysis_summary?: string;
+    };
 }
 
 export interface ImportGitHubProjectResponse {

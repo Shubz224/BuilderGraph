@@ -4,7 +4,6 @@ import { Container } from '../ui/Container';
 import { Button } from '../ui/Button';
 import { User, ExternalLink, Github, LogOut } from 'lucide-react';
 import logo from '../../assets/logo.png';
-import { userStore } from '../../stores/userStore';
 import { api } from '../../services/api';
 import type { Profile } from '../../types/api.types';
 
@@ -12,24 +11,47 @@ const Navbar: React.FC = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
-    const cachedProfile = userStore.getUserProfile();
-    if (cachedProfile) {
-      setProfile(cachedProfile);
-    }
-
-    // Check for authentication status
-    const checkAuth = async () => {
-      // If we don't have a profile, check with backend
-      if (!cachedProfile) {
+    const loadProfile = async () => {
+      try {
+        // Check authentication status first
         const authStatus = await api.checkAuthStatus();
-        if (authStatus.authenticated && authStatus.user) {
-          userStore.saveUserProfile(authStatus.user);
-          setProfile(authStatus.user);
+        if (authStatus.authenticated && authStatus.user && authStatus.user.username) {
+          // Load full profile by username from API (standard way)
+          const profileResponse = await api.getProfileByUsername(authStatus.user.username);
+          if (profileResponse.success && profileResponse.profile) {
+            setProfile(profileResponse.profile);
+            return;
+          }
+          
+          // If profile not found by username, use auth user data as fallback
+          // This happens when user just connected GitHub but profile isn't fully set up
+          setProfile({
+            id: authStatus.user.id,
+            username: authStatus.user.username,
+            full_name: authStatus.user.full_name || authStatus.user.username,
+            avatar_url: authStatus.user.avatar_url,
+            email: authStatus.user.email || '',
+            location: authStatus.user.location || '',
+            bio: authStatus.user.bio || undefined,
+            skills: [],
+            experience: 0,
+            languages: [],
+            specializations: [],
+            github_username: authStatus.user.github_username || authStatus.user.username,
+            github_repos: [],
+            ual: authStatus.user.ual || '',
+            dataset_root: '',
+            publish_status: authStatus.user.publish_status || 'pending',
+            created_at: new Date().toISOString(),
+            explorerUrl: ''
+          });
         }
+      } catch (error) {
+        console.error('Failed to load profile:', error);
       }
     };
 
-    checkAuth();
+    loadProfile();
   }, []);
 
   const profileLink = profile?.username ? `/${profile.username}` : '/profile-setup';
@@ -37,7 +59,6 @@ const Navbar: React.FC = () => {
   const handleLogout = async () => {
     const result = await api.logout();
     if (result.success) {
-      userStore.clearUser();
       setProfile(null);
       window.location.reload();
     }
