@@ -252,6 +252,113 @@ class ApiService {
     }
 
     /**
+     * Delete a project by ID
+     */
+    async deleteProject(projectId: number): Promise<{ success: boolean; message?: string; error?: string }> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/projects/${projectId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                return result as ApiError;
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Delete project error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to delete project',
+            };
+        }
+    }
+
+    /**
+     * Scrape GitHub repository data (file structure, README, commits)
+     */
+    async scrapeGitHubRepository(repoUrl: string, ownerUAL: string): Promise<{ success: boolean; data?: any; error?: string }> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/projects/import/github/scrape`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                body: JSON.stringify({ repoUrl, ownerUAL }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                return {
+                    success: false,
+                    error: result.error || 'Failed to scrape repository',
+                };
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Scrape GitHub repository error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to scrape repository',
+            };
+        }
+    }
+
+    /**
+     * Analyze repository data using AI and generate JSON-LD with score
+     */
+    async analyzeRepository(scrapedData: any, ownerUAL: string): Promise<{ success: boolean; json_ld?: any; score?: number; scoreBreakdown?: any; analysis_summary?: string; error?: string }> {
+        let timeoutId: NodeJS.Timeout | null = null;
+        try {
+            // Add timeout to prevent hanging
+            const controller = new AbortController();
+            timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+
+            const response = await fetch(`${API_BASE_URL}/projects/import/github/analyze`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: 'include',
+                signal: controller.signal,
+                body: JSON.stringify({
+                    scrapedData,
+                    ownerUAL,
+                }),
+            });
+
+            if (timeoutId) clearTimeout(timeoutId);
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                return {
+                    success: false,
+                    error: result.error || 'Failed to analyze repository',
+                };
+            }
+
+            return result;
+        } catch (error) {
+            if (timeoutId) clearTimeout(timeoutId);
+            console.error('Analyze repository error:', error);
+            
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to analyze repository',
+            };
+        }
+    }
+
+    /**
      * Import a project from GitHub
      */
     async importGitHubProject(
@@ -652,6 +759,41 @@ class ApiService {
             return {
                 authenticated: false,
                 user: null,
+            };
+        }
+    }
+
+    /**
+     * Get aggregated project data (scores and programming languages) from ai_analysis table
+     */
+    async getAggregatedProjectData(ownerUAL: string): Promise<{ 
+        success: boolean; 
+        totalScore?: number; 
+        scoreBreakdown?: {
+            commitScore: number;
+            structureScore: number;
+            readmeScore: number;
+            metadataScore: number;
+        };
+        projectCount?: number; 
+        programmingLanguages?: string[]; 
+        error?: string 
+    }> {
+        try {
+            const encodedUAL = encodeURIComponent(ownerUAL);
+            const response = await fetch(`${API_BASE_URL}/projects/aggregated/${encodedUAL}`);
+            const result = await response.json();
+
+            if (!response.ok) {
+                return result as ApiError;
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Get aggregated project data error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to get aggregated project data',
             };
         }
     }

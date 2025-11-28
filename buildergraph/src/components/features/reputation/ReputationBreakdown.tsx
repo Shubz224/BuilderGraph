@@ -12,7 +12,7 @@ interface ReputationBreakdownProps {
 }
 
 const ReputationBreakdown: React.FC<ReputationBreakdownProps> = ({ items }) => {
-  const total = items.reduce((sum, item) => sum + item.value, 0);
+  // const total = items.reduce((sum, item) => sum + item.value, 0);
 
   const getColor = (index: number) => {
     const colors = [
@@ -37,7 +37,7 @@ const ReputationBreakdown: React.FC<ReputationBreakdownProps> = ({ items }) => {
       {/* Breakdown Grid */}
       <div className="grid grid-cols-2 gap-4 mb-6">
         {items.map((item, index) => {
-          const percentage = (item.value / total) * 100;
+          // const percentage = (item.value / total) * 100;
           return (
             <div
               key={index}
@@ -57,16 +57,16 @@ const ReputationBreakdown: React.FC<ReputationBreakdownProps> = ({ items }) => {
 
                 {/* Value */}
                 <div className="text-3xl font-bold text-text-primary mb-3">
-                  {item.value}%
+                  {item.value}
                 </div>
 
-                {/* Progress Bar */}
+                {/* Progress Bar
                 <div className="w-full h-2 bg-background rounded-full overflow-hidden">
                   <div
                     className={`h-full bg-gradient-to-r ${getColor(index)} transition-all duration-700 ease-out`}
-                    style={{ width: `${percentage}%` }}
+                    style={{ width: `${percentage}` }}
                   />
-                </div>
+                </div> */}
               </div>
             </div>
           );
@@ -76,10 +76,10 @@ const ReputationBreakdown: React.FC<ReputationBreakdownProps> = ({ items }) => {
       {/* Footer Info */}
       <div className="pt-4 border-t border-white/10">
         <div className="text-xs text-text-secondary leading-relaxed">
-          Reputation is calculated from <span className="text-primary font-semibold">code quality</span>,
-          <span className="text-accent font-semibold"> consistency</span>,
-          <span className="text-primary font-semibold"> peer endorsements</span>, and
-          <span className="text-accent font-semibold"> project diversity</span>.
+          Reputation is calculated from <span className="text-primary font-semibold">Commit Score</span>,
+          <span className="text-accent font-semibold"> Structure Score</span>,
+          <span className="text-primary font-semibold"> Readme Score</span>, and
+          <span className="text-accent font-semibold"> Metadata Score</span>.
         </div>
       </div>
     </Card>

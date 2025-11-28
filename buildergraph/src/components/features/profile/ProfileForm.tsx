@@ -6,10 +6,8 @@ import { Step1BasicInfo } from './Step1BasicInfo';
 import { Step2Skills } from './Step2Skills';
 import { Step3GitHub } from './Step3GitHub';
 import { Step4Review } from './Step4Review';
-import { DKGPublishingLoader } from '../../ui/DKGPublishingLoader';
-import { SuccessCelebration } from '../../ui/SuccessCelebration';
 import { api } from '../../../services/api';
-import { userStore } from '../../../stores/userStore';
+import { publishingStore } from '../../../stores/publishingStore';
 import type { ProfileFormData } from '../../../types/api.types';
 
 const ProfileForm: React.FC = () => {
@@ -25,12 +23,7 @@ const ProfileForm: React.FC = () => {
     step3: null,
   });
 
-  // Publishing states
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishSuccess, setPublishSuccess] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
-  const [userUAL, setUserUAL] = useState<string | null>(null);
-  const [progress, setProgress] = useState(0);
 
   const steps = ['Basic Info', 'Skills', 'GitHub', 'Review'];
 
@@ -53,9 +46,7 @@ const ProfileForm: React.FC = () => {
   };
 
   const handleStep4Submit = async () => {
-    setIsPublishing(true);
     setPublishError(null);
-    setProgress(10);
 
     try {
       // Combine all form data
@@ -83,78 +74,25 @@ const ProfileForm: React.FC = () => {
         throw new Error(errorMsg);
       }
 
-      setProgress(30);
-
       console.log('✅ Profile creation started:', createResponse);
 
-      // Wait for publishing to complete with progress updates
-      const finalStatus = await api.waitForProfilePublishing(
-        createResponse.operationId,
-        (status) => {
-          console.log('📊 Status update:', status);
-          // Update progress based on polling (gradually increase)
-          setProgress((prev) => Math.min(prev + 10, 90));
-        }
-      );
+      // Start background publishing
+      publishingStore.startPublishing('profile', 'Your Profile');
+      publishingStore.monitorProfilePublishing();
 
-      if (!finalStatus.success || finalStatus.status === 'failed') {
-        throw new Error(finalStatus.error || 'Publishing failed');
-      }
+      // Navigate to dashboard immediately
+      navigate('/dashboard');
 
-      setProgress(100);
-
-      console.log('🎉 Profile published successfully!', finalStatus);
-
-      // Save UAL and profile data
-      if (finalStatus.ual) {
-        userStore.saveUserUAL(finalStatus.ual);
-        setUserUAL(finalStatus.ual);
-
-        // Fetch and cache full profile data
-        const profileResponse = await api.getProfile(finalStatus.ual);
-        if (profileResponse.success) {
-          userStore.saveUserProfile(profileResponse.profile);
-        }
-      }
-
-      // Show success celebration
-      setIsPublishing(false);
-      setPublishSuccess(true);
     } catch (error) {
       console.error('❌ Profile creation error:', error);
-      setIsPublishing(false);
       setPublishError(error instanceof Error ? error.message : 'Failed to create profile');
     }
   };
 
-  const handleCelebrationComplete = () => {
-    // Navigate to dashboard
-    navigate('/dashboard');
-  };
-
   const handleRetry = () => {
     setPublishError(null);
-    setProgress(0);
     handleStep4Submit();
   };
-
-  // Show loading screen while publishing
-  if (isPublishing) {
-    return <DKGPublishingLoader message="Publishing your developer profile" progress={progress} />;
-  }
-
-  // Show success celebration
-  if (publishSuccess && userUAL) {
-    return (
-      <SuccessCelebration
-        title="Profile Created!"
-        message="Hey Developer, your profile is created!"
-        ual={userUAL}
-        onComplete={handleCelebrationComplete}
-        autoRedirectSeconds={5}
-      />
-    );
-  }
 
   // Show error state
   if (publishError) {

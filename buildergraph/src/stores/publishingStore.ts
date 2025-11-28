@@ -194,6 +194,41 @@ class PublishingStore {
             this.setError('Profile publishing timed out. Please try again later.');
         }
     }
+    /**
+     * Monitor project publishing status
+     */
+    async monitorProjectPublishing(operationId: string): Promise<void> {
+        if (this.state.status !== 'publishing' || this.state.itemType !== 'project') {
+            return;
+        }
+
+        try {
+            // Wait for publishing to complete with progress updates
+            const finalStatus = await api.waitForProjectPublishing(
+                operationId,
+                (status) => {
+                    // We can map status steps to progress if available, or just increment
+                    // For now, let's just ensure we show some progress
+                    // The API polling inside waitForProjectPublishing doesn't give percentage, 
+                    // but we can simulate or just rely on the fact that it's "publishing"
+                    // Let's increment progress slowly if we could, but here we just get status updates
+                    // We can assume if we get a status update, we are making progress
+                    this.updateProgress(Math.min(this.state.progress + 10, 90));
+                }
+            );
+
+            if (finalStatus.success && finalStatus.status === 'completed' && finalStatus.ual) {
+                console.log('🎉 Project published successfully!', finalStatus);
+                this.setSuccess(finalStatus.ual);
+            } else {
+                console.error('❌ Project publishing failed:', finalStatus);
+                this.setError(finalStatus.error || 'Project publishing failed');
+            }
+        } catch (error) {
+            console.error('❌ Project publishing error:', error);
+            this.setError(error instanceof Error ? error.message : 'Failed to publish project');
+        }
+    }
 }
 
 export const publishingStore = new PublishingStore();

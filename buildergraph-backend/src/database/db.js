@@ -71,10 +71,41 @@ export function initializeDatabase() {
       dataset_root TEXT,
       publish_status TEXT DEFAULT 'pending',
       operation_id TEXT,
+      ai_analysis_hash TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (owner_ual) REFERENCES profiles(ual)
     )
+  `);
+
+  // Add ai_analysis_hash column to projects table if it doesn't exist
+  try {
+    db.exec(`
+      ALTER TABLE projects ADD COLUMN ai_analysis_hash TEXT
+    `);
+  } catch (error) {
+    // Column already exists, ignore error
+    if (!error.message.includes('duplicate column')) {
+      console.warn('Warning adding ai_analysis_hash column:', error.message);
+    }
+  }
+
+  // Create ai_analysis table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS ai_analysis (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      hash TEXT UNIQUE NOT NULL,
+      analysis_text TEXT NOT NULL,
+      score INTEGER,
+      score_breakdown TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Create index on hash for faster lookups
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_ai_analysis_hash ON ai_analysis(hash)
   `);
 
   // Create endorsements table
@@ -101,6 +132,124 @@ export function initializeDatabase() {
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Create all_data table to store all published DKG data
+  // ual = user's/profile's UAL (not unique, as one user can have multiple projects)
+  // project_ual = project's UAL (unique per project)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS all_data (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ual TEXT NOT NULL,
+      dataset_root TEXT,
+      project_ual TEXT UNIQUE,
+      user_ual TEXT,
+      published_data TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Add user_ual column if it doesn't exist (for existing databases)
+  try {
+    db.exec(`
+      ALTER TABLE all_data ADD COLUMN user_ual TEXT
+    `);
+  } catch (error) {
+    // Column already exists, ignore error
+    if (!error.message.includes('duplicate column')) {
+      console.warn('Warning adding user_ual column:', error.message);
+    }
+  }
+
+  // Create index on UAL for faster lookups
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_all_data_ual ON all_data(ual)
+  `);
+
+  // Create index on project_ual for faster lookups
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_all_data_project_ual ON all_data(project_ual)
+  `);
+
+  // Create index on user_ual for faster lookups
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_all_data_user_ual ON all_data(user_ual)
+  `);
+
+  // Migrate existing all_data rows to populate user_ual and project_ual
+  try {
+    console.log('🔄 Migrating existing all_data rows...');
+    const selectStmt = db.prepare('SELECT * FROM all_data WHERE user_ual IS NULL OR project_ual IS NULL');
+    const allDataRows = selectStmt.all();
+    
+    let migratedCount = 0;
+    const updateStmt = db.prepare(`
+      UPDATE all_data 
+      SET ual = ?, user_ual = ?, project_ual = ?, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `);
+    
+    // Prepare statement to get project by UAL
+    const getProjectByUalStmt = db.prepare('SELECT * FROM projects WHERE ual = ?');
+
+    for (const row of allDataRows) {
+      try {
+        // Try to find project by UAL (row.ual is currently the project UAL)
+        // First try row.ual as project UAL
+        let project = getProjectByUalStmt.get(row.ual);
+        
+        // If not found, try project_ual field
+        if (!project && row.project_ual) {
+          project = getProjectByUalStmt.get(row.project_ual);
+        }
+        
+        if (project) {
+          // Update: ual = user's UAL (owner_ual), project_ual = project's UAL
+          const projectUAL = row.project_ual || row.ual; // Use existing project_ual or row.ual as project UAL
+          const userUAL = project.owner_ual; // User's/profile's UAL
+          updateStmt.run(userUAL, userUAL, projectUAL, row.id);
+          migratedCount++;
+        } else {
+          // If project not found, try to extract from published_data
+          try {
+            const publishedData = typeof row.published_data === 'string' 
+              ? JSON.parse(row.published_data) 
+              : row.published_data;
+            
+            // Try to find creator/owner UAL from published data
+            let ownerUal = null;
+            if (publishedData?.public) {
+              const creator = publishedData.public['schema:creator'] || publishedData.public['prov:wasAttributedTo'];
+              if (creator && creator['@id']) {
+                ownerUal = creator['@id'];
+              }
+            }
+            
+            if (ownerUal) {
+              // row.ual is the project UAL, ownerUal is the user UAL
+              const projectUAL = row.project_ual || row.ual;
+              updateStmt.run(ownerUal, ownerUal, projectUAL, row.id);
+              migratedCount++;
+            } else {
+              console.warn(`⚠️ Could not find owner UAL for all_data row with UAL: ${row.ual}`);
+            }
+          } catch (parseError) {
+            console.warn(`⚠️ Could not parse published_data for UAL: ${row.ual}`, parseError.message);
+          }
+        }
+      } catch (error) {
+        console.error(`❌ Error migrating all_data row with UAL: ${row.ual}`, error.message);
+      }
+    }
+    
+    if (migratedCount > 0) {
+      console.log(`✅ Migrated ${migratedCount} all_data row(s)`);
+    } else {
+      console.log('✅ No all_data rows needed migration');
+    }
+  } catch (error) {
+    console.warn('⚠️ Error during all_data migration:', error.message);
+  }
 
   console.log('✅ Database initialized at:', dbPath);
   return db;
@@ -228,8 +377,8 @@ export const projectQueries = {
     const stmt = db.prepare(`
       INSERT INTO projects (
         owner_ual, name, description, repository_url, tech_stack,
-        category, live_url, ual, dataset_root, publish_status, operation_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        category, live_url, ual, dataset_root, publish_status, operation_id, ai_analysis_hash
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     return stmt.run(
@@ -243,7 +392,8 @@ export const projectQueries = {
       project.ual || null,
       project.dataset_root || null,
       project.publish_status || 'pending',
-      project.operation_id || null
+      project.operation_id || null,
+      project.ai_analysis_hash || null
     );
   },
 
@@ -294,7 +444,67 @@ export const projectQueries = {
   // Legacy method - kept for compatibility
   getByUserUal: (userUal) => {
     return projectQueries.getByOwnerUal(userUal);
-  }
+  },
+
+  // Delete project by ID
+  deleteById: (id) => {
+    const stmt = db.prepare('DELETE FROM projects WHERE id = ?');
+    return stmt.run(id);
+  },
+
+  updateAiAnalysisHash: (id, hash) => {
+    const stmt = db.prepare(`
+      UPDATE projects 
+      SET ai_analysis_hash = ?, updated_at = CURRENT_TIMESTAMP 
+      WHERE id = ?
+    `);
+    return stmt.run(hash, id);
+  },
+};
+
+/**
+ * AI Analysis queries
+ */
+export const aiAnalysisQueries = {
+  insert: (hash, analysisText, score, scoreBreakdown) => {
+    const stmt = db.prepare(`
+      INSERT INTO ai_analysis (hash, analysis_text, score, score_breakdown)
+      VALUES (?, ?, ?, ?)
+    `);
+    return stmt.run(
+      hash,
+      analysisText,
+      score,
+      scoreBreakdown ? JSON.stringify(scoreBreakdown) : null
+    );
+  },
+
+  getByHash: (hash) => {
+    const stmt = db.prepare('SELECT * FROM ai_analysis WHERE hash = ?');
+    const result = stmt.get(hash);
+    if (result && result.score_breakdown) {
+      try {
+        result.score_breakdown = JSON.parse(result.score_breakdown);
+      } catch (e) {
+        // Keep as string if parsing fails
+      }
+    }
+    return result;
+  },
+
+  update: (hash, analysisText, score, scoreBreakdown) => {
+    const stmt = db.prepare(`
+      UPDATE ai_analysis 
+      SET analysis_text = ?, score = ?, score_breakdown = ?, updated_at = CURRENT_TIMESTAMP 
+      WHERE hash = ?
+    `);
+    return stmt.run(
+      analysisText,
+      score,
+      scoreBreakdown ? JSON.stringify(scoreBreakdown) : null,
+      hash
+    );
+  },
 };
 
 /**
@@ -432,6 +642,94 @@ export const endorsementQueries = {
       LIMIT ?
     `);
     return stmt.all(userUal, limit);
+  }
+};
+
+/**
+ * All Data queries - stores all published DKG data
+ */
+export const allDataQueries = {
+  // Insert published data
+  insert: (data) => {
+    const stmt = db.prepare(`
+      INSERT INTO all_data (ual, dataset_root, project_ual, user_ual, published_data)
+      VALUES (?, ?, ?, ?, ?)
+    `);
+    return stmt.run(
+      data.ual,
+      data.dataset_root || null,
+      data.project_ual || null,
+      data.user_ual || null,
+      JSON.stringify(data.published_data)
+    );
+  },
+
+  // Get by UAL
+  getByUal: (ual) => {
+    const stmt = db.prepare('SELECT * FROM all_data WHERE ual = ?');
+    const result = stmt.get(ual);
+    if (result && result.published_data) {
+      try {
+        result.published_data = JSON.parse(result.published_data);
+      } catch (e) {
+        // Keep as string if parsing fails
+      }
+    }
+    return result;
+  },
+
+  // Get by project UAL
+  getByProjectUal: (projectUal) => {
+    const stmt = db.prepare('SELECT * FROM all_data WHERE project_ual = ?');
+    const results = stmt.all(projectUal);
+    return results.map(result => {
+      if (result.published_data) {
+        try {
+          result.published_data = JSON.parse(result.published_data);
+        } catch (e) {
+          // Keep as string if parsing fails
+        }
+      }
+      return result;
+    });
+  },
+
+  // Get by user UAL (user's/profile's UAL)
+  getByUserUal: (userUal) => {
+    const stmt = db.prepare('SELECT * FROM all_data WHERE ual = ? OR user_ual = ?');
+    const results = stmt.all(userUal, userUal);
+    return results.map(result => {
+      if (result.published_data) {
+        try {
+          result.published_data = JSON.parse(result.published_data);
+        } catch (e) {
+          // Keep as string if parsing fails
+        }
+      }
+      return result;
+    });
+  },
+
+  // Get all
+  getAll: () => {
+    const stmt = db.prepare('SELECT * FROM all_data ORDER BY created_at DESC');
+    const results = stmt.all();
+    return results.map(result => {
+      if (result.published_data) {
+        try {
+          result.published_data = JSON.parse(result.published_data);
+        } catch (e) {
+          // Keep as string if parsing fails
+        }
+      }
+      return result;
+    });
+  },
+
+  // Delete by UAL
+  deleteByUal: (ual) => {
+    const stmt = db.prepare('DELETE FROM all_data WHERE ual = ?');
+    return stmt.run(ual);
   }
 };
 
