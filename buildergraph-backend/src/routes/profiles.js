@@ -2,7 +2,7 @@
  * Profile API Routes - DKG.js SDK Integration
  */
 import express from 'express';
-import { profileQueries } from '../database/db.js';
+import { profileQueries, allDataQueries } from '../database/db.js';
 import dkgjsService from '../services/dkgjs-service.js';
 import { profileToJSONLD } from '../utils/jsonld-converter.js';
 
@@ -237,6 +237,34 @@ router.get('/:identifier', (req, res) => {
             });
         }
 
+        // Calculate reputation score
+        let reputationScore = 0;
+        if (profile.ual) {
+            const allData = allDataQueries.getByUserUal(profile.ual);
+            if (allData) {
+                allData.forEach(projectData => {
+                    if (projectData.published_data) {
+                        try {
+                            const data = typeof projectData.published_data === 'string'
+                                ? JSON.parse(projectData.published_data)
+                                : projectData.published_data;
+
+                            // Check for score at root level
+                            if (data.score) {
+                                reputationScore += data.score;
+                            }
+                            // Check for score in public object (fallback)
+                            else if (data.public && data.public.score) {
+                                reputationScore += data.public.score;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing published_data:', e);
+                        }
+                    }
+                });
+            }
+        }
+
         res.json({
             success: true,
             profile: {
@@ -245,7 +273,8 @@ router.get('/:identifier', (req, res) => {
                 languages: profile.languages ? JSON.parse(profile.languages) : null,
                 specializations: profile.specializations ? JSON.parse(profile.specializations) : null,
                 github_repos: profile.github_repos ? JSON.parse(profile.github_repos) : null,
-                explorerUrl: profile.ual ? `https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(profile.ual)}` : null
+                explorerUrl: profile.ual ? `https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(profile.ual)}` : null,
+                reputation_score: reputationScore
             }
         });
 
@@ -265,18 +294,44 @@ router.get('/:identifier', (req, res) => {
 router.get('/', (req, res) => {
     try {
         const profiles = profileQueries.getAll();
+        const allData = allDataQueries.getAll();
 
-        res.json({
-            success: true,
-            count: profiles.length,
-            profiles: profiles.map(p => ({
+        // Calculate reputation scores for each profile
+        const profilesWithScores = profiles.map(p => {
+            let reputationScore = 0;
+
+            // Find all data entries for this user
+            const userProjects = allData.filter(d => d.user_ual === p.ual || d.ual === p.ual);
+
+            userProjects.forEach(projectData => {
+                if (projectData.published_data) {
+                    const data = projectData.published_data;
+                    // Check for score at root level
+                    if (data.score) {
+                        reputationScore += data.score;
+                    }
+                    // Check for score in public object (fallback)
+                    else if (data.public && data.public.score) {
+                        reputationScore += data.public.score;
+                    }
+                }
+            });
+
+            return {
                 ...p,
                 skills: p.skills ? JSON.parse(p.skills) : null,
                 languages: p.languages ? JSON.parse(p.languages) : null,
                 specializations: p.specializations ? JSON.parse(p.specializations) : null,
                 github_repos: p.github_repos ? JSON.parse(p.github_repos) : null,
-                explorerUrl: p.ual ? `https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(p.ual)}` : null
-            }))
+                explorerUrl: p.ual ? `https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(p.ual)}` : null,
+                reputation_score: reputationScore
+            };
+        });
+
+        res.json({
+            success: true,
+            count: profilesWithScores.length,
+            profiles: profilesWithScores
         });
 
     } catch (error) {
@@ -304,6 +359,34 @@ router.get('/username/:username', (req, res) => {
             });
         }
 
+        // Calculate reputation score
+        let reputationScore = 0;
+        if (profile.ual) {
+            const allData = allDataQueries.getByUserUal(profile.ual);
+            if (allData) {
+                allData.forEach(projectData => {
+                    if (projectData.published_data) {
+                        try {
+                            const data = typeof projectData.published_data === 'string'
+                                ? JSON.parse(projectData.published_data)
+                                : projectData.published_data;
+
+                            // Check for score at root level
+                            if (data.score) {
+                                reputationScore += data.score;
+                            }
+                            // Check for score in public object (fallback)
+                            else if (data.public && data.public.score) {
+                                reputationScore += data.public.score;
+                            }
+                        } catch (e) {
+                            console.error('Error parsing published_data:', e);
+                        }
+                    }
+                });
+            }
+        }
+
         res.json({
             success: true,
             profile: {
@@ -314,7 +397,8 @@ router.get('/username/:username', (req, res) => {
                 github_repos: profile.github_repos ? JSON.parse(profile.github_repos) : [],
                 ual: profile.ual || null,
                 dataset_root: profile.dataset_root || null,
-                explorerUrl: profile.ual ? `https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(profile.ual)}` : null
+                explorerUrl: profile.ual ? `https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(profile.ual)}` : null,
+                reputation_score: reputationScore
             }
         });
 
