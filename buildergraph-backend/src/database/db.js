@@ -176,19 +176,38 @@ export function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_all_data_user_ual ON all_data(user_ual)
   `);
 
+  // Create profile_access table for payment tracking
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS profile_access (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      payer_wallet_address TEXT NOT NULL,
+      profile_username TEXT NOT NULL,
+      transaction_hash TEXT UNIQUE NOT NULL,
+      amount_paid TEXT NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      expires_at DATETIME
+    )
+  `);
+
+  // Create index on payer_wallet_address and profile_username for faster lookups
+  db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_profile_access_payer_profile 
+    ON profile_access(payer_wallet_address, profile_username)
+  `);
+
   // Migrate existing all_data rows to populate user_ual and project_ual
   try {
     console.log('🔄 Migrating existing all_data rows...');
     const selectStmt = db.prepare('SELECT * FROM all_data WHERE user_ual IS NULL OR project_ual IS NULL');
     const allDataRows = selectStmt.all();
-    
+
     let migratedCount = 0;
     const updateStmt = db.prepare(`
       UPDATE all_data 
       SET ual = ?, user_ual = ?, project_ual = ?, updated_at = CURRENT_TIMESTAMP 
       WHERE id = ?
     `);
-    
+
     // Prepare statement to get project by UAL
     const getProjectByUalStmt = db.prepare('SELECT * FROM projects WHERE ual = ?');
 
@@ -197,12 +216,12 @@ export function initializeDatabase() {
         // Try to find project by UAL (row.ual is currently the project UAL)
         // First try row.ual as project UAL
         let project = getProjectByUalStmt.get(row.ual);
-        
+
         // If not found, try project_ual field
         if (!project && row.project_ual) {
           project = getProjectByUalStmt.get(row.project_ual);
         }
-        
+
         if (project) {
           // Update: ual = user's UAL (owner_ual), project_ual = project's UAL
           const projectUAL = row.project_ual || row.ual; // Use existing project_ual or row.ual as project UAL
@@ -212,10 +231,10 @@ export function initializeDatabase() {
         } else {
           // If project not found, try to extract from published_data
           try {
-            const publishedData = typeof row.published_data === 'string' 
-              ? JSON.parse(row.published_data) 
+            const publishedData = typeof row.published_data === 'string'
+              ? JSON.parse(row.published_data)
               : row.published_data;
-            
+
             // Try to find creator/owner UAL from published data
             let ownerUal = null;
             if (publishedData?.public) {
@@ -224,7 +243,7 @@ export function initializeDatabase() {
                 ownerUal = creator['@id'];
               }
             }
-            
+
             if (ownerUal) {
               // row.ual is the project UAL, ownerUal is the user UAL
               const projectUAL = row.project_ual || row.ual;
@@ -241,7 +260,7 @@ export function initializeDatabase() {
         console.error(`❌ Error migrating all_data row with UAL: ${row.ual}`, error.message);
       }
     }
-    
+
     if (migratedCount > 0) {
       console.log(`✅ Migrated ${migratedCount} all_data row(s)`);
     } else {
@@ -731,6 +750,41 @@ export const allDataQueries = {
     const stmt = db.prepare('DELETE FROM all_data WHERE ual = ?');
     return stmt.run(ual);
   }
+};
+
+/**
+ * Profile Access queries
+ */
+export const profileAccessQueries = {
+  // Grant access after payment
+  grantAccess: (payerWalletAddress, profileUsername, transactionHash, amountPaid) => {
+    const stmt = db.prepare(`
+      INSERT INTO profile_access (payer_wallet_address, profile_username, transaction_hash, amount_paid)
+      VALUES (?, ?, ?, ?)
+    `);
+    return stmt.run(payerWalletAddress, profileUsername, transactionHash, amountPaid);
+  },
+
+  // Check if user has access
+  hasAccess: (payerWalletAddress, profileUsername) => {
+    const stmt = db.prepare(`
+      SELECT * FROM profile_access 
+      WHERE payer_wallet_address = ? AND profile_username = ?
+      AND (expires_at IS NULL OR expires_at > datetime('now'))
+      LIMIT 1
+    `);
+    return stmt.get(payerWalletAddress, profileUsername);
+  },
+
+  // Get all access records for a wallet
+  getAccessByWallet: (payerWalletAddress) => {
+    const stmt = db.prepare(`
+      SELECT * FROM profile_access 
+      WHERE payer_wallet_address = ?
+      ORDER BY created_at DESC
+    `);
+    return stmt.all(payerWalletAddress);
+  },
 };
 
 export { db };

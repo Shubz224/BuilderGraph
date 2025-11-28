@@ -10,6 +10,7 @@ import { initializeDatabase } from './database/db.js';
 import profilesRouter from './routes/profiles.js';
 import projectsRouter from './routes/projects.js';
 import endorsementsRouter from './routes/endorsements.js';
+import paymentsRouter from './routes/payments.js';
 import authRouter from './routes/auth.js';
 
 dotenv.config();
@@ -88,6 +89,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/profiles', profilesRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/endorsements', endorsementsRouter);
+app.use('/api/payments', paymentsRouter);
 
 // Error handling
 app.use((err, req, res, next) => {

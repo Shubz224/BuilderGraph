@@ -2,7 +2,7 @@
  * Profile API Routes - DKG.js SDK Integration
  */
 import express from 'express';
-import { profileQueries, allDataQueries } from '../database/db.js';
+import { profileQueries, allDataQueries, aiAnalysisQueries } from '../database/db.js';
 import dkgjsService from '../services/dkgjs-service.js';
 import { profileToJSONLD } from '../utils/jsonld-converter.js';
 
@@ -404,6 +404,111 @@ router.get('/username/:username', (req, res) => {
 
     } catch (error) {
         console.error('Error fetching profile by username:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+});
+
+/**
+ * GET /api/profiles/:username/full-data
+ * Get full project data including AI analysis for a user
+ */
+router.get('/:username/full-data', (req, res) => {
+    try {
+        const { username } = req.params;
+        const profile = profileQueries.getByUsername(username);
+
+        if (!profile) {
+            return res.status(404).json({
+                success: false,
+                error: 'Profile not found'
+            });
+        }
+
+        const fullData = [];
+
+        if (profile.ual) {
+            const allData = allDataQueries.getByUserUal(profile.ual);
+
+            if (allData) {
+                allData.forEach(projectData => {
+                    if (projectData.published_data) {
+                        try {
+                            const data = typeof projectData.published_data === 'string'
+                                ? JSON.parse(projectData.published_data)
+                                : projectData.published_data;
+
+                            // Access public data if available
+                            const publicData = data.public || data;
+
+                            const projectInfo = {
+                                name: publicData['schema:name'] || 'Unknown Project',
+                                description: publicData['schema:description'] || '',
+                                ual: projectData.ual,
+                                aiAnalysis: null
+                            };
+
+                            // Check for AI Analysis
+                            // Strategy: Look for aiAnalysis in schema:additionalProperty inside public data
+                            let analysisHash = null;
+
+                            if (publicData['schema:additionalProperty']) {
+                                const props = Array.isArray(publicData['schema:additionalProperty'])
+                                    ? publicData['schema:additionalProperty']
+                                    : [publicData['schema:additionalProperty']];
+
+                                const analysisProp = props.find(p => p['schema:name'] === 'aiAnalysis');
+                                if (analysisProp) {
+                                    analysisHash = analysisProp['schema:value'];
+                                }
+                            }
+
+                            // Fallback: check root level properties if not found in additionalProperty
+                            if (!analysisHash) {
+                                analysisHash = data.aiAnalysisHash || data.ai_analysis_hash;
+                            }
+
+                            if (analysisHash) {
+                                const analysis = aiAnalysisQueries.getByHash(analysisHash);
+                                if (analysis) {
+                                    projectInfo.aiAnalysis = {
+                                        score: analysis.score,
+                                        breakdown: typeof analysis.score_breakdown === 'string' ? JSON.parse(analysis.score_breakdown) : analysis.score_breakdown,
+                                        summary: analysis.analysis_text
+                                    };
+                                }
+                            } else {
+                                // Fallback: if we have score/breakdown at root (which we added in repair), use that
+                                if (data.score) {
+                                    projectInfo.aiAnalysis = {
+                                        score: data.score,
+                                        breakdown: data.scoreBreakdown,
+                                        summary: 'AI Analysis data retrieved from project metadata.'
+                                    };
+                                }
+                            }
+
+                            fullData.push(projectInfo);
+
+                        } catch (e) {
+                            console.error('Error parsing published_data for full view:', e);
+                        }
+                    }
+                });
+            }
+        }
+
+        res.json({
+            success: true,
+            username: profile.username,
+            fullName: profile.full_name,
+            projects: fullData
+        });
+
+    } catch (error) {
+        console.error('Error fetching full data:', error);
         res.status(500).json({
             success: false,
             error: error.message

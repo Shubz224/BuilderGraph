@@ -17,33 +17,33 @@ rows.forEach((row, index) => {
 
     try {
         const data = JSON.parse(row.published_data);
-        console.log('Published Data Keys:', Object.keys(data));
-        console.log('Score (root):', data.score);
+        const publicData = data.public || data;
 
-        if (data.public) {
-            console.log('Public Keys:', Object.keys(data.public));
-            console.log('Score (public):', data.public.score);
-            console.log('Score Breakdown (public):', data.public.scoreBreakdown);
+        let analysisHash = null;
+        if (publicData['schema:additionalProperty']) {
+            const props = Array.isArray(publicData['schema:additionalProperty'])
+                ? publicData['schema:additionalProperty']
+                : [publicData['schema:additionalProperty']];
+            const analysisProp = props.find(p => p['schema:name'] === 'aiAnalysis');
+            if (analysisProp) {
+                analysisHash = analysisProp['schema:value'];
+                console.log('Found Hash in JSON:', analysisHash);
+            }
         }
 
-        // Check project and ai_analysis
-        const project = db.prepare('SELECT * FROM projects WHERE ual = ?').get(row.project_ual);
-        if (project) {
-            console.log('Project found:', project.name);
-            console.log('AI Analysis Hash:', project.ai_analysis_hash);
-            if (project.ai_analysis_hash) {
-                const analysis = db.prepare('SELECT * FROM ai_analysis WHERE hash = ?').get(project.ai_analysis_hash);
-                if (analysis) {
-                    console.log('Analysis found. Score:', analysis.score);
-                    console.log('Analysis Breakdown:', analysis.score_breakdown);
-                } else {
-                    console.log('Analysis NOT found for hash:', project.ai_analysis_hash);
-                }
+        if (analysisHash) {
+            const analysis = db.prepare('SELECT * FROM ai_analysis WHERE hash = ?').get(analysisHash);
+            if (analysis) {
+                console.log('Analysis found in DB. Text length:', analysis.analysis_text ? analysis.analysis_text.length : 0);
+            } else {
+                console.log('Analysis NOT found in DB for hash:', analysisHash);
             }
-        } else {
-            console.log('Project NOT found for UAL:', row.project_ual);
         }
     } catch (e) {
         console.log('Failed to parse published_data:', e.message);
     }
 });
+
+// Check ai_analysis table columns
+const tableInfo = db.prepare("PRAGMA table_info(ai_analysis)").all();
+console.log('\nai_analysis Table Columns:', tableInfo.map(c => c.name));
