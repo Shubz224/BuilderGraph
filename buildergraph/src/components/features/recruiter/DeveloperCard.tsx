@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Card } from '../../ui/Card';
 import { Button } from '../../ui/Button';
-import { IoLocationSharp, IoMail, IoLockOpen, IoCheckmarkCircle, IoLogoGithub, IoGlobe } from 'react-icons/io5';
+import { IoLocationSharp, IoMail, IoLockOpen, IoCheckmarkCircle, IoLogoGithub } from 'react-icons/io5';
 
 interface DeveloperCardProps {
     id: string;
@@ -55,7 +55,7 @@ const DeveloperCard: React.FC<DeveloperCardProps> = ({
                         className="w-24 h-24 rounded-full border-2 border-white/10 group-hover:border-primary/50 transition-colors object-cover"
                     />
                     {verified && (
-                        <div className="absolute -bottom-1 -right-1 bg-background-card rounded-full p-1" title="Verified Developer">
+                        <div className="absolute -bottom-1 -right-1 bg-background-card rounded-full p-1" title="Verified on DKG">
                             <IoCheckmarkCircle className="text-accent text-xl" />
                         </div>
                     )}
@@ -85,7 +85,6 @@ const DeveloperCard: React.FC<DeveloperCardProps> = ({
                             </div>
                             <div className="flex items-center gap-3">
                                 <a href="#" className="hover:text-primary transition-colors"><IoLogoGithub className="text-lg" /></a>
-                                <a href="#" className="hover:text-primary transition-colors"><IoGlobe className="text-lg" /></a>
                             </div>
                         </div>
                     </div>

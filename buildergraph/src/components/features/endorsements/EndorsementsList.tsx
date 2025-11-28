@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container } from '../../ui/Container';
 import { Button } from '../../ui/Button';
 import { EndorsementCard } from './EndorsementCard';
@@ -6,15 +6,57 @@ import { EndorsementTabs } from './EndorsementTabs';
 import { GiveEndorsementModal } from './GiveEndorsementModal';
 import { RequestEndorsementModal } from './RequestEndorsementModal';
 import { EndorsementStats } from './EndorsementStats';
-import { mockEndorsements } from '../../../data/mockData';
+import { api } from '../../../services/api';
+import { userStore } from '../../../stores/userStore';
+import type { Endorsement } from '../../../types/api.types';
 
 const EndorsementsList: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'received' | 'given'>('received');
   const [showGiveModal, setShowGiveModal] = useState(false);
   const [showRequestModal, setShowRequestModal] = useState(false);
+  const [receivedEndorsements, setReceivedEndorsements] = useState<Endorsement[]>([]);
+  const [givenEndorsements, setGivenEndorsements] = useState<Endorsement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({ totalEndorsements: 0, totalTracStaked: 0, averageRating: 0 });
 
-  const receivedEndorsements = mockEndorsements;
-  const givenEndorsements = mockEndorsements.slice(0, 1);
+  useEffect(() => {
+    loadEndorsements();
+  }, []);
+
+  const loadEndorsements = async () => {
+    const userUAL = userStore.getUserUAL();
+    if (!userUAL) {
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // Load received endorsements
+      const receivedResponse = await api.getEndorsementsByUser(userUAL);
+      if (receivedResponse.success) {
+        setReceivedEndorsements(receivedResponse.endorsements);
+        setStats(receivedResponse.stats);
+      }
+
+      // Load given endorsements
+      const givenResponse = await api.getGivenEndorsements(userUAL);
+      if (givenResponse.success) {
+        setGivenEndorsements(givenResponse.endorsements);
+      }
+    } catch (error) {
+      console.error('Failed to load endorsements:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-20">
@@ -26,16 +68,10 @@ const EndorsementsList: React.FC = () => {
               Endorsements
             </h1>
             <p className="text-text-secondary">
-              Build trust through peer validation
+              Build trust through peer validation with TRAC stakes
             </p>
           </div>
           <div className="flex gap-4">
-            <Button
-              variant="secondary"
-              onClick={() => setShowRequestModal(true)}
-            >
-              Request Endorsement
-            </Button>
             <Button onClick={() => setShowGiveModal(true)}>
               Give Endorsement
             </Button>
@@ -44,11 +80,9 @@ const EndorsementsList: React.FC = () => {
 
         {/* Stats */}
         <EndorsementStats
-          receivedCount={receivedEndorsements.length}
-          totalStaked={
-            receivedEndorsements.reduce((sum, e) => sum + e.stakeAmount, 0)
-          }
-          avgRating={4.5}
+          receivedCount={stats.totalEndorsements}
+          totalStaked={stats.totalTracStaked}
+          avgRating={stats.averageRating}
         />
 
         {/* Tabs */}
@@ -67,8 +101,15 @@ const EndorsementsList: React.FC = () => {
                 {receivedEndorsements.map((endorsement) => (
                   <EndorsementCard
                     key={endorsement.id}
-                    {...endorsement}
+                    id={endorsement.id.toString()}
+                    endorser={endorsement.endorser_name}
+                    skill={endorsement.skill_name || ''}
+                    message={endorsement.message}
+                    rating={endorsement.rating}
+                    stakeAmount={endorsement.trac_staked}
+                    date={new Date(endorsement.created_at).toLocaleDateString()}
                     isGiven={false}
+                    ual={endorsement.ual}
                   />
                 ))}
               </div>
@@ -77,9 +118,6 @@ const EndorsementsList: React.FC = () => {
                 <p className="text-text-secondary mb-4">
                   No endorsements yet. Share your portfolio and ask colleagues to endorse you!
                 </p>
-                <Button variant="secondary">
-                  Share Your Profile
-                </Button>
               </div>
             )}
           </div>
@@ -90,7 +128,13 @@ const EndorsementsList: React.FC = () => {
                 {givenEndorsements.map((endorsement) => (
                   <EndorsementCard
                     key={endorsement.id}
-                    {...endorsement}
+                    id={endorsement.id.toString()}
+                    endorser={`→ ${endorsement.target_username || 'Project'}`}
+                    skill={endorsement.skill_name || endorsement.target_type}
+                    message={endorsement.message}
+                    rating={endorsement.rating}
+                    stakeAmount={endorsement.trac_staked}
+                    date={new Date(endorsement.created_at).toLocaleDateString()}
                     isGiven={true}
                   />
                 ))}
@@ -112,8 +156,10 @@ const EndorsementsList: React.FC = () => {
       {/* Modals */}
       <GiveEndorsementModal
         isOpen={showGiveModal}
-        onClose={() => setShowGiveModal(false)}
-        onSubmit={() => setShowGiveModal(false)}
+        onClose={() => {
+          setShowGiveModal(false);
+          loadEndorsements(); // Reload after creating
+        }}
       />
 
       <RequestEndorsementModal

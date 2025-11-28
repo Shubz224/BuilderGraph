@@ -10,6 +10,7 @@ interface EndorsementCardProps {
   stakeAmount: number;
   date: string;
   isGiven?: boolean;
+  ual?: string;
 }
 
 const EndorsementCard: React.FC<EndorsementCardProps> = ({
@@ -20,7 +21,10 @@ const EndorsementCard: React.FC<EndorsementCardProps> = ({
   stakeAmount,
   date,
   isGiven = false,
+  ual,
 }) => {
+  const explorerUrl = ual ? `https://dkg-testnet.origintrail.io/explore?ual=${encodeURIComponent(ual)}` : null;
+
   return (
     <Card>
       {/* Header */}
@@ -62,6 +66,28 @@ const EndorsementCard: React.FC<EndorsementCardProps> = ({
         </div>
         <span className="text-text-muted text-xs">{date}</span>
       </div>
+
+      {/* DKG Verification */}
+      {ual && explorerUrl && (
+        <div className="mt-4 pt-4 border-t border-white/5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-5 h-5 bg-gradient-to-r from-primary to-accent rounded-full flex items-center justify-center">
+                <span className="text-white text-xs">✓</span>
+              </div>
+              <span className="text-text-muted text-xs">Verified on DKG</span>
+            </div>
+            <a
+              href={explorerUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:text-primary/80 transition flex items-center gap-1"
+            >
+              View on Explorer →
+            </a>
+          </div>
+        </div>
+      )}
 
       {/* Action Buttons */}
       {isGiven && (

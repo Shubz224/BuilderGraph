@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import { initializeDatabase } from './database/db.js';
 import profilesRouter from './routes/profiles.js';
 import projectsRouter from './routes/projects.js';
+import endorsementsRouter from './routes/endorsements.js';
 
 dotenv.config();
 
@@ -46,6 +47,7 @@ app.get('/', (req, res) => {
         endpoints: {
             profiles: '/api/profiles',
             projects: '/api/projects',
+            endorsements: '/api/endorsements',
             health: '/health'
         }
     });
@@ -63,6 +65,7 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/profiles', profilesRouter);
 app.use('/api/projects', projectsRouter);
+app.use('/api/endorsements', endorsementsRouter);
 
 // Error handling
 app.use((err, req, res, next) => {
@@ -102,6 +105,9 @@ app.listen(PORT, () => {
     console.log('   GET  /api/projects          - List all projects');
     console.log('   GET  /api/projects/:id      - Get project by ID');
     console.log('   GET  /api/projects/user/:userUal - Get projects by user UAL');
+    console.log('   POST /api/endorsements      - Create endorsement');
+    console.log('   GET  /api/endorsements/user/:ual - Get endorsements for user');
+    console.log('   GET  /api/endorsements/project/:id - Get endorsements for project');
     console.log('='.repeat(60) + '\n');
 });
 

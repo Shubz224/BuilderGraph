@@ -1,10 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Container } from '../../ui/Container';
 import { SearchBar } from './SearchBar';
 import { FilterSidebar } from './FilterSidebar';
 import { DeveloperCard } from './DeveloperCard';
 import { IoPeople, IoShieldCheckmark, IoTrendingUp, IoFlash } from 'react-icons/io5';
+import { api } from '../../../services/api';
+import type { Profile } from '../../../types/api.types';
+import { getReputationScore } from '../../../utils/reputation';
 
 const RecruiterDashboard: React.FC = () => {
     const [searchQuery, setSearchQuery] = useState('');
@@ -14,77 +17,45 @@ const RecruiterDashboard: React.FC = () => {
         location: '',
         reputationMin: 0,
     });
+    const [developers, setDevelopers] = useState<Profile[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    const mockDevelopers = [
-        {
-            id: '1',
-            name: 'Alice Johnson',
-            username: 'alicecodes',
-            title: 'Senior Full-Stack Developer',
-            location: 'San Francisco, CA',
-            skills: ['TypeScript', 'React', 'Node.js', 'GraphQL'],
-            reputationScore: 847,
-            avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=alice',
-            isContactUnlocked: false,
-            verified: true,
-            matchScore: 98,
-        },
-        {
-            id: '2',
-            name: 'Bob Smith',
-            username: 'bobthebuilder',
-            title: 'Blockchain Engineer',
-            location: 'Remote',
-            skills: ['Solidity', 'Rust', 'Web3', 'TypeScript'],
-            reputationScore: 923,
-            avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=bob',
-            isContactUnlocked: false,
-            verified: true,
-            matchScore: 95,
-        },
-        {
-            id: '3',
-            name: 'Carol Chen',
-            username: 'carolcodes',
-            title: 'Backend Engineer',
-            location: 'New York, NY',
-            skills: ['Python', 'Go', 'PostgreSQL', 'Docker'],
-            reputationScore: 756,
-            avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=carol',
-            isContactUnlocked: false,
-            verified: false,
-            matchScore: 88,
-        },
-        {
-            id: '4',
-            name: 'David Lee',
-            username: 'daviddev',
-            title: 'Frontend Specialist',
-            location: 'London, UK',
-            skills: ['React', 'TypeScript', 'CSS', 'Next.js'],
-            reputationScore: 689,
-            avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=david',
-            isContactUnlocked: false,
-            verified: true,
-            matchScore: 82,
-        },
-    ];
+    useEffect(() => {
+        const loadDevelopers = async () => {
+            try {
+                const response = await api.getAllProfiles();
+                if (response.success) {
+                    setDevelopers(response.profiles);
+                }
+            } catch (error) {
+                console.error('Failed to load developers:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadDevelopers();
+    }, []);
 
     // Filter developers
-    const filteredDevelopers = mockDevelopers.filter((dev) => {
+    const filteredDevelopers = developers.filter((dev) => {
         // Search query
-        if (searchQuery && !dev.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-            !dev.skills.some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))) {
+        if (searchQuery &&
+            !dev.full_name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+            !dev.username.toLowerCase().includes(searchQuery.toLowerCase()) &&
+            !(dev.skills || []).some(s => s.toLowerCase().includes(searchQuery.toLowerCase()))) {
             return false;
         }
 
         // Skills filter
-        if (filters.skills.length > 0 && !filters.skills.some(s => dev.skills.includes(s))) {
+        if (filters.skills.length > 0 &&
+            !filters.skills.some(s => (dev.skills || []).includes(s))) {
             return false;
         }
 
-        // Reputation filter
-        if (dev.reputationScore < filters.reputationMin) {
+        // Experience filter (assume reputation score correlates)
+        const devExp = dev.experience || 0;
+        if (devExp < filters.experience[0] || devExp > filters.experience[1]) {
             return false;
         }
 
@@ -96,11 +67,22 @@ const RecruiterDashboard: React.FC = () => {
     };
 
     const stats = [
-        { label: 'Total Developers', value: '12,453', icon: <IoPeople />, change: '+12% this week', color: 'text-blue-400' },
-        { label: 'Verified Skills', value: '8,932', icon: <IoShieldCheckmark />, change: '+5% this week', color: 'text-emerald-400' },
-        { label: 'Active Today', value: '1,245', icon: <IoFlash />, change: '+18% this week', color: 'text-amber-400' },
-        { label: 'Avg Reputation', value: '756', icon: <IoTrendingUp />, change: '+2% this week', color: 'text-purple-400' },
+        { label: 'Total Developers', value: developers.length.toString(), icon: <IoPeople />, change: `${developers.filter(d => d.ual).length} verified`, color: 'text-blue-400' },
+        { label: 'On DKG', value: developers.filter(d => d.ual).length.toString(), icon: <IoShieldCheckmark />, change: 'Published', color: 'text-emerald-400' },
+        { label: 'Total Projects', value: '–', icon: <IoFlash />, change: 'Linked', color: 'text-amber-400' },
+        { label: 'Avg Experience', value: developers.length > 0 ? Math.round(developers.reduce((sum, d) => sum + (d.experience || 0), 0) / developers.length) + 'y' : '0y', icon: <IoTrendingUp />, change: 'Average', color: 'text-purple-400' },
     ];
+
+    if (loading) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="text-center">
+                    <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                    <p className="text-text-secondary">Loading developers...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen pb-20 bg-background">
@@ -112,7 +94,7 @@ const RecruiterDashboard: React.FC = () => {
                             Talent <span className="text-accent">Discovery</span>
                         </h1>
                         <p className="text-lg text-text-secondary max-w-2xl">
-                            Access the world's first verified developer graph. Find talent with cryptographic proof of skills and contribution history.
+                            Access verified developer profiles on the Decentralized Knowledge Graph. Find talent with cryptographic proof of skills.
                         </p>
                     </div>
 
@@ -171,10 +153,9 @@ const RecruiterDashboard: React.FC = () => {
                             <div className="flex items-center gap-3">
                                 <span className="text-sm text-text-secondary">Sort by:</span>
                                 <select className="px-4 py-2 rounded-lg bg-background-elevated border border-white/10 text-text-primary focus:outline-none focus:border-primary cursor-pointer hover:bg-white/5 transition-colors">
-                                    <option>Relevance (Best Match)</option>
-                                    <option>Reputation (High to Low)</option>
+                                    <option>Recently Added</option>
                                     <option>Experience (High to Low)</option>
-                                    <option>Recently Active</option>
+                                    <option>Most Skills</option>
                                 </select>
                             </div>
                         </div>
@@ -189,7 +170,19 @@ const RecruiterDashboard: React.FC = () => {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: index * 0.1 }}
                                     >
-                                        <DeveloperCard {...dev} />
+                                        <DeveloperCard
+                                            id={dev.id.toString()}
+                                            name={dev.full_name}
+                                            username={dev.username}
+                                            title={`${dev.experience || 0}+ years experience`}
+                                            location={dev.location}
+                                            skills={dev.skills || []}
+                                            reputationScore={getReputationScore(dev)}
+                                            avatar={`https://api.dicebear.com/7.x/avataaars/svg?seed=${dev.username}`}
+                                            isContactUnlocked={false}
+                                            verified={!!dev.ual}
+                                            matchScore={Math.min(70 + (dev.skills?.length || 0) * 3, 99)}
+                                        />
                                     </motion.div>
                                 ))}
                             </div>
@@ -198,7 +191,9 @@ const RecruiterDashboard: React.FC = () => {
                                 <div className="text-6xl mb-4">🔍</div>
                                 <h3 className="text-xl font-bold text-text-primary mb-2">No developers found</h3>
                                 <p className="text-text-secondary max-w-md mx-auto">
-                                    We couldn't find any developers matching your specific criteria. Try adjusting your filters or search terms.
+                                    {developers.length === 0
+                                        ? "No developers have created profiles yet. Be the first!"
+                                        : "We couldn't find any developers matching your specific criteria. Try adjusting your filters or search terms."}
                                 </p>
                             </div>
                         )}

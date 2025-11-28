@@ -1,17 +1,19 @@
 import React from 'react';
 import { Card } from '../../ui/Card';
 import { useNavigate } from 'react-router-dom';
-import { IoStar, IoSave } from 'react-icons/io5';
+import { IoCheckmarkCircle, IoGlobe, IoLogoGithub } from 'react-icons/io5';
 
 interface ProjectCardProps {
   id: string;
   name: string;
   description: string;
   techStack: string[];
-  stars: number;
-  commits: number;
-  codeQualityScore: number;
-  lastUpdated: string;
+  category?: string;
+  repositoryUrl?: string;
+  liveUrl?: string;
+  ual?: string;
+  explorerUrl?: string;
+  createdAt: string;
 }
 
 const ProjectCard: React.FC<ProjectCardProps> = ({
@@ -19,10 +21,11 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
   name,
   description,
   techStack,
-  stars,
-  commits,
-  codeQualityScore,
-  lastUpdated,
+  repositoryUrl,
+  liveUrl,
+  ual,
+  explorerUrl,
+  createdAt,
 }) => {
   const navigate = useNavigate();
 
@@ -34,9 +37,16 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
     >
       {/* Header */}
       <div className="mb-4 pb-4 border-b border-white/5">
-        <h3 className="text-lg font-semibold text-text-primary mb-1">
-          {name}
-        </h3>
+        <div className="flex items-start justify-between mb-2">
+          <h3 className="text-lg font-semibold text-text-primary flex-1">
+            {name}
+          </h3>
+          {ual && (
+            <div className="ml-2">
+              <IoCheckmarkCircle className="text-accent text-xl" title="Published to DKG" />
+            </div>
+          )}
+        </div>
         <p className="text-text-secondary text-sm line-clamp-2">
           {description}
         </p>
@@ -59,36 +69,61 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
         )}
       </div>
 
-      {/* Metrics */}
+      {/* Links & UAL */}
       <div className="mt-auto space-y-3">
-        {/* Quality Score */}
-        <div className="flex items-center justify-between">
-          <span className="text-text-secondary text-sm">Code Quality</span>
-          <div className="flex items-center gap-2">
-            <div className="w-16 h-1 bg-background rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-primary to-accent"
-                style={{ width: `${codeQualityScore}%` }}
-              />
+        {/* UAL Section */}
+        {ual && (
+          <div className="p-2 bg-background-elevated rounded border border-white/5">
+            <div className="text-xs text-text-muted mb-1">Universal Asset Locator</div>
+            <div className="flex items-center gap-2">
+              <code className="text-xs text-accent font-mono flex-1 truncate">
+                {ual.slice(0, 40)}...
+              </code>
+              {explorerUrl && (
+                <a
+                  href={explorerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="px-2 py-1 bg-primary/20 hover:bg-primary/30 text-accent text-xs rounded transition-colors"
+                  title="View on DKG Explorer"
+                >
+                  DKG →
+                </a>
+              )}
             </div>
-            <span className="text-accent font-semibold text-sm">
-              {codeQualityScore}%
-            </span>
           </div>
-        </div>
+        )}
 
-        {/* Stats */}
-        <div className="flex justify-between items-center text-text-secondary text-sm">
-          <div className="flex items-center gap-1">
-            <IoStar className="text-accent" />
-            <span>{stars}</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <IoSave className="text-primary" />
-            <span>{commits}</span>
-          </div>
-          <div className="text-xs">
-            Updated {lastUpdated}
+        {/* Links */}
+        <div className="flex items-center gap-3 text-text-secondary text-sm">
+          {repositoryUrl && (
+            <a
+              href={repositoryUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="hover:text-primary transition-colors flex items-center gap-1"
+            >
+              <IoLogoGithub className="text-lg" />
+              <span className="text-xs">Repo</span>
+            </a>
+          )}
+          {liveUrl && (
+            <a
+              href={liveUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="hover:text-primary transition-colors flex items-center gap-1"
+            >
+              <IoGlobe className="text-lg" />
+              <span className="text-xs">Live</span>
+            </a>
+          )}
+          <div className="flex-1" />
+          <div className="text-xs text-text-muted">
+            {new Date(createdAt).toLocaleDateString()}
           </div>
         </div>
       </div>

@@ -9,6 +9,8 @@ interface HeroSectionProps {
     bio: string;
     reputationScore: number;
     avatar: string;
+    ual?: string;
+    explorerUrl?: string;
 }
 
 const HeroSection: React.FC<HeroSectionProps> = ({
@@ -18,14 +20,17 @@ const HeroSection: React.FC<HeroSectionProps> = ({
     bio,
     reputationScore,
     avatar,
+    ual,
+    explorerUrl,
 }) => {
     const [copied, setCopied] = useState(false);
-    const ual = "did:dkg:otp:2043/0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419/123456"; // Example full UAL
 
     const handleCopyUAL = () => {
-        navigator.clipboard.writeText(ual);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        if (ual) {
+            navigator.clipboard.writeText(ual);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
     };
 
     return (
@@ -87,31 +92,43 @@ const HeroSection: React.FC<HeroSectionProps> = ({
                 </div>
 
                 {/* DKG Badge */}
-                <div className="mb-10 flex flex-col items-center">
-                    <div className="flex items-center gap-2 mb-2 text-text-secondary text-sm">
-                        <ShieldCheck className="w-4 h-4 text-accent" />
-                        <span>Verified on Decentralized Knowledge Graph</span>
-                    </div>
-                    <button
-                        onClick={handleCopyUAL}
-                        className="group relative inline-flex items-center gap-3 px-5 py-3 bg-accent/5 border border-accent/20 rounded-xl hover:bg-accent/10 transition-all cursor-pointer max-w-full"
-                    >
-                        <div className="flex flex-col items-start">
-                            <span className="text-[10px] text-text-secondary uppercase tracking-wider font-semibold">Universal Asset Locator (UAL)</span>
-                            <span className="text-accent font-mono text-sm break-all text-left">
-                                {ual}
-                            </span>
+                {ual && (
+                    <div className="mb-10 flex flex-col items-center">
+                        <div className="flex items-center gap-2 mb-2 text-text-secondary text-sm">
+                            <ShieldCheck className="w-4 h-4 text-accent" />
+                            <span>Verified on Decentralized Knowledge Graph</span>
                         </div>
-                        <div className="pl-3 border-l border-accent/20 text-accent/50 group-hover:text-accent transition-colors">
-                            {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-                        </div>
-                        {copied && (
-                            <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-accent text-white text-xs px-2 py-1 rounded shadow-lg animate-fade-in-up">
-                                Copied!
-                            </span>
+                        <button
+                            onClick={handleCopyUAL}
+                            className="group relative inline-flex items-center gap-3 px-5 py-3 bg-accent/5 border border-accent/20 rounded-xl hover:bg-accent/10 transition-all cursor-pointer max-w-full"
+                        >
+                            <div className="flex flex-col items-start">
+                                <span className="text-[10px] text-text-secondary uppercase tracking-wider font-semibold">Universal Asset Locator (UAL)</span>
+                                <span className="text-accent font-mono text-sm break-all text-left">
+                                    {ual}
+                                </span>
+                            </div>
+                            <div className="pl-3 border-l border-accent/20 text-accent/50 group-hover:text-accent transition-colors">
+                                {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                            </div>
+                            {copied && (
+                                <span className="absolute -top-8 left-1/2 -translate-x-1/2 bg-accent text-white text-xs px-2 py-1 rounded shadow-lg animate-fade-in-up">
+                                    Copied!
+                                </span>
+                            )}
+                        </button>
+                        {explorerUrl && (
+                            <a
+                                href={explorerUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="mt-3 text-sm text-accent hover:underline"
+                            >
+                                View on DKG Explorer →
+                            </a>
                         )}
-                    </button>
-                </div>
+                    </div>
+                )}
 
                 {/* Social Links */}
                 <div className="flex justify-center gap-4">

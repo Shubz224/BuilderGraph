@@ -1,11 +1,23 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Container } from '../ui/Container';
 import { Button } from '../ui/Button';
 import { User, ExternalLink, Github } from 'lucide-react';
 import logo from '../../assets/logo.png';
+import { userStore } from '../../stores/userStore';
 
 const Navbar: React.FC = () => {
+  const [username, setUsername] = useState<string | null>(null);
+
+  useEffect(() => {
+    const profile = userStore.getUserProfile();
+    if (profile) {
+      setUsername(profile.username);
+    }
+  }, []);
+
+  const profileLink = username ? `/${username}` : '/profile-setup';
+
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-white/5">
       <Container maxWidth="2xl" className="py-4">
@@ -45,24 +57,26 @@ const Navbar: React.FC = () => {
             >
               Recruiters
             </Link>
-            <Link
-              to="https://dkg.origintrail.io/"
+            <a
+              href="https://dkg-testnet.origintrail.io/"
               target="_blank"
               rel="noopener noreferrer"
-              className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-white/5 rounded-full transition-all flex items-center gap-2"
+              className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-accent hover:bg-white/5 rounded-full transition-all flex items-center gap-2"
             >
               DKG Explorer <ExternalLink className="w-3 h-3" />
-            </Link>
+            </a>
           </div>
 
           {/* Right Side Actions */}
           <div className="flex items-center gap-4">
             <Link
-              to="/alex_dev"
+              to={profileLink}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-primary/10 to-accent/10 border border-primary/20 hover:border-primary/40 transition-all group"
             >
               <User className="w-4 h-4 text-primary group-hover:text-accent transition-colors" />
-              <span className="text-sm font-medium text-text-primary">My Profile</span>
+              <span className="text-sm font-medium text-text-primary">
+                {username ? 'My Profile' : 'Create Profile'}
+              </span>
             </Link>
 
             <div className="h-6 w-px bg-white/10" />
