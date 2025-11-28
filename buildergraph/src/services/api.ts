@@ -13,6 +13,9 @@ import type {
     ProjectStatusResponse,
     Project,
     ProjectsByOwnerResponse,
+    ImportGitHubProjectData,
+    ImportGitHubProjectResponse,
+    GitHubRepositoriesResponse,
     CreateEndorsementData,
     CreateEndorsementResponse,
     EndorsementStatusResponse,
@@ -244,6 +247,62 @@ class ApiService {
             return {
                 success: false,
                 error: error instanceof Error ? error.message : 'Failed to get project',
+            };
+        }
+    }
+
+    /**
+     * Import a project from GitHub
+     */
+    async importGitHubProject(
+        data: ImportGitHubProjectData
+    ): Promise<ImportGitHubProjectResponse | ApiError> {
+        try {
+            const response = await fetch(`${API_BASE_URL}/projects/import/github`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(data),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                return result as ApiError;
+            }
+
+            return result as ImportGitHubProjectResponse;
+        } catch (error) {
+            console.error('Import GitHub project error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to import GitHub project',
+            };
+        }
+    }
+
+    /**
+     * Get GitHub repositories for the authenticated user
+     */
+    async getGitHubRepositories(ownerUAL: string): Promise<GitHubRepositoriesResponse | ApiError> {
+        try {
+            const encodedUAL = encodeURIComponent(ownerUAL);
+            const response = await fetch(`${API_BASE_URL}/projects/import/github/repos?ownerUAL=${encodedUAL}`, {
+                credentials: 'include',
+            });
+            const result = await response.json();
+
+            if (!response.ok) {
+                return result as ApiError;
+            }
+
+            return result as GitHubRepositoriesResponse;
+        } catch (error) {
+            console.error('Get GitHub repositories error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to fetch GitHub repositories',
             };
         }
     }

@@ -128,7 +128,7 @@ passport.deserializeUser((id, done) => {
  */
 router.get('/github',
   passport.authenticate('github', {
-    scope: ['user:email', 'read:user']
+    scope: ['user:email', 'read:user', 'repo']
   })
 );
 

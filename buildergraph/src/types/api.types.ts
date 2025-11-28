@@ -127,6 +127,53 @@ export interface ProjectsByOwnerResponse {
     projects: Project[];
 }
 
+export interface ImportGitHubProjectData {
+    repoUrl: string;
+    ownerUAL: string;
+    accessToken?: string;
+}
+
+export interface ImportGitHubProjectResponse {
+    success: boolean;
+    message: string;
+    projectId: number;
+    operationId: string;
+    status: 'publishing';
+    ownerUAL: string;
+    projectData: ProjectFormData;
+}
+
+export interface GitHubRepositoryOwner {
+    login: string;
+    avatarUrl?: string;
+}
+
+export interface GitHubRepository {
+    id: number;
+    name: string;
+    fullName: string;
+    private: boolean;
+    visibility?: string;
+    description?: string;
+    htmlUrl: string;
+    sshUrl?: string;
+    updatedAt: string;
+    pushedAt?: string;
+    defaultBranch: string;
+    language?: string;
+    owner: GitHubRepositoryOwner;
+}
+
+export interface GitHubRepositoriesResponse {
+    success: boolean;
+    repositories: GitHubRepository[];
+    pagination?: {
+        page: number;
+        perPage: number;
+        returned: number;
+    };
+}
+
 // Endorsement Data
 export interface Endorsement {
     id: number;

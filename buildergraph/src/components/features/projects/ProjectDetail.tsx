@@ -7,6 +7,22 @@ import { api } from '../../../services/api';
 import type { Project } from '../../../types/api.types';
 import { IoLogoGithub, IoGlobe, IoCheckmarkCircle, IoCopy } from 'react-icons/io5';
 
+// Helper function to normalize tech_stack to always be an array
+const normalizeTechStack = (techStack: any): string[] => {
+  if (Array.isArray(techStack)) {
+    return techStack;
+  }
+  if (typeof techStack === 'string') {
+    try {
+      const parsed = JSON.parse(techStack);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 const ProjectDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -97,7 +113,7 @@ const ProjectDetail: React.FC = () => {
 
           {/* Tech Stack */}
           <div className="flex flex-wrap gap-2 mb-6">
-            {project.tech_stack.map((tech) => (
+            {normalizeTechStack(project.tech_stack).map((tech) => (
               <span
                 key={tech}
                 className="px-3 py-1 bg-primary/10 text-accent rounded-lg text-sm font-medium"

@@ -7,7 +7,7 @@ interface ProjectCardProps {
   id: string;
   name: string;
   description: string;
-  techStack: string[];
+  techStack: string[] | any;
   category?: string;
   repositoryUrl?: string;
   liveUrl?: string;
@@ -15,6 +15,22 @@ interface ProjectCardProps {
   explorerUrl?: string;
   createdAt: string;
 }
+
+// Helper function to normalize techStack to always be an array
+const normalizeTechStack = (techStack: any): string[] => {
+  if (Array.isArray(techStack)) {
+    return techStack;
+  }
+  if (typeof techStack === 'string') {
+    try {
+      const parsed = JSON.parse(techStack);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
 
 const ProjectCard: React.FC<ProjectCardProps> = ({
   id,
@@ -28,6 +44,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
   createdAt,
 }) => {
   const navigate = useNavigate();
+  
+  // Normalize techStack to ensure it's always an array
+  const normalizedTechStack = normalizeTechStack(techStack);
 
   return (
     <Card
@@ -54,7 +73,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
 
       {/* Tech Stack */}
       <div className="mb-4 flex flex-wrap gap-2">
-        {techStack.slice(0, 3).map((tech) => (
+        {normalizedTechStack.slice(0, 3).map((tech) => (
           <span
             key={tech}
             className="px-2 py-1 bg-primary/10 text-accent rounded text-xs font-medium"
@@ -62,9 +81,9 @@ const ProjectCard: React.FC<ProjectCardProps> = ({
             {tech}
           </span>
         ))}
-        {techStack.length > 3 && (
+        {normalizedTechStack.length > 3 && (
           <span className="px-2 py-1 bg-primary/10 text-accent rounded text-xs font-medium">
-            +{techStack.length - 3}
+            +{normalizedTechStack.length - 3}
           </span>
         )}
       </div>

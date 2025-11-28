@@ -25,6 +25,22 @@ import { userStore } from '../stores/userStore';
 import type { Profile, Project } from '../types/api.types';
 import { getReputationScore } from '../utils/reputation';
 
+// Helper function to normalize tech_stack to always be an array
+const normalizeTechStack = (techStack: any): string[] => {
+  if (Array.isArray(techStack)) {
+    return techStack;
+  }
+  if (typeof techStack === 'string') {
+    try {
+      const parsed = JSON.parse(techStack);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -360,19 +376,26 @@ const Dashboard: React.FC = () => {
 
                     {/* Tech Stack */}
                     <div className="flex flex-wrap gap-2 mb-4">
-                      {project.tech_stack.slice(0, 3).map((tech) => (
-                        <span
-                          key={tech}
-                          className="px-3 py-1 bg-gradient-to-r from-primary/20 to-accent/20 text-accent rounded-full text-xs font-semibold border border-primary/30 hover:border-accent/50 transition-colors"
-                        >
-                          {tech}
-                        </span>
-                      ))}
-                      {project.tech_stack.length > 3 && (
-                        <span className="px-3 py-1 bg-white/5 text-text-secondary rounded-full text-xs font-semibold">
-                          +{project.tech_stack.length - 3}
-                        </span>
-                      )}
+                      {(() => {
+                        const techStack = normalizeTechStack(project.tech_stack);
+                        return (
+                          <>
+                            {techStack.slice(0, 3).map((tech: string) => (
+                              <span
+                                key={tech}
+                                className="px-3 py-1 bg-gradient-to-r from-primary/20 to-accent/20 text-accent rounded-full text-xs font-semibold border border-primary/30 hover:border-accent/50 transition-colors"
+                              >
+                                {tech}
+                              </span>
+                            ))}
+                            {techStack.length > 3 && (
+                              <span className="px-3 py-1 bg-white/5 text-text-secondary rounded-full text-xs font-semibold">
+                                +{techStack.length - 3}
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
 
                     {/* Links */}
