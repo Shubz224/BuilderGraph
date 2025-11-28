@@ -12,6 +12,35 @@ const router = express.Router();
 const publishOperations = new Map();
 
 /**
+ * Validate profile data
+ */
+function validateProfileData(data) {
+    const errors = [];
+
+    // Required fields
+    if (!data.fullName || data.fullName.trim() === '') {
+        errors.push('Full name is required');
+    }
+
+    if (!data.username || data.username.trim() === '') {
+        errors.push('Username is required');
+    } else if (!/^[a-zA-Z0-9_-]+$/.test(data.username)) {
+        errors.push('Username can only contain letters, numbers, underscores, and hyphens');
+    }
+
+    if (!data.email || data.email.trim() === '') {
+        errors.push('Email is required');
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+        errors.push('Invalid email format');
+    }
+
+    return {
+        valid: errors.length === 0,
+        errors: errors
+    };
+}
+
+/**
  * POST /api/profiles
  * Create a new profile and publish to DKG (async)
  */

@@ -2,21 +2,46 @@ import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Container } from '../ui/Container';
 import { Button } from '../ui/Button';
-import { User, ExternalLink, Github } from 'lucide-react';
+import { User, ExternalLink, Github, LogOut } from 'lucide-react';
 import logo from '../../assets/logo.png';
 import { userStore } from '../../stores/userStore';
+import { api } from '../../services/api';
+import type { Profile } from '../../types/api.types';
 
 const Navbar: React.FC = () => {
-  const [username, setUsername] = useState<string | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
-    const profile = userStore.getUserProfile();
-    if (profile) {
-      setUsername(profile.username);
+    const cachedProfile = userStore.getUserProfile();
+    if (cachedProfile) {
+      setProfile(cachedProfile);
     }
+
+    // Check for authentication status
+    const checkAuth = async () => {
+      // If we don't have a profile, check with backend
+      if (!cachedProfile) {
+        const authStatus = await api.checkAuthStatus();
+        if (authStatus.authenticated && authStatus.user) {
+          userStore.saveUserProfile(authStatus.user);
+          setProfile(authStatus.user);
+        }
+      }
+    };
+
+    checkAuth();
   }, []);
 
-  const profileLink = username ? `/${username}` : '/profile-setup';
+  const profileLink = profile?.username ? `/${profile.username}` : '/profile-setup';
+
+  const handleLogout = async () => {
+    const result = await api.logout();
+    if (result.success) {
+      userStore.clearUser();
+      setProfile(null);
+      window.location.reload();
+    }
+  };
 
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-white/5">
@@ -75,21 +100,52 @@ const Navbar: React.FC = () => {
             >
               <User className="w-4 h-4 text-primary group-hover:text-accent transition-colors" />
               <span className="text-sm font-medium text-text-primary">
-                {username ? 'My Profile' : 'Create Profile'}
+                {profile ? 'My Profile' : 'Create Profile'}
               </span>
             </Link>
 
             <div className="h-6 w-px bg-white/10" />
 
-            <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="text-text-secondary hover:text-text-primary">
-                Sign In
-              </Button>
-              <Button size="sm" className="bg-white text-black hover:bg-white/90">
-                <Github className="w-4 h-4 mr-2" />
-                Connect
-              </Button>
-            </div>
+            {profile ? (
+              /* Show user info when authenticated */
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  {profile.avatar_url && (
+                    <img
+                      src={profile.avatar_url}
+                      alt={profile.username}
+                      className="w-8 h-8 rounded-full border-2 border-primary/30"
+                    />
+                  )}
+                  <div className="hidden lg:block">
+                    <p className="text-sm font-medium text-text-primary">
+                      {profile.full_name || profile.username}
+                    </p>
+                    <p className="text-xs text-text-secondary">@{profile.username}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="text-text-secondary hover:text-red-400"
+                >
+                  <LogOut className="w-4 h-4" />
+                </Button>
+              </div>
+            ) : (
+              /* Show login button when not authenticated */
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  className="bg-white text-black hover:bg-white/90"
+                  onClick={() => api.loginWithGitHub()}
+                >
+                  <Github className="w-4 h-4 mr-2" />
+                  Connect GitHub
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       </Container>

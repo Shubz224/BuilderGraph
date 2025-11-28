@@ -44,6 +44,9 @@ export function initializeDatabase() {
       specializations TEXT,
       github_username TEXT,
       github_repos TEXT,
+      github_id TEXT UNIQUE,
+      avatar_url TEXT,
+      access_token TEXT,
       ual TEXT UNIQUE,
       dataset_root TEXT,
       publish_status TEXT DEFAULT 'pending',
@@ -71,6 +74,31 @@ export function initializeDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (owner_ual) REFERENCES profiles(ual)
+    )
+  `);
+
+  // Create endorsements table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS endorsements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      endorser_ual TEXT NOT NULL,
+      endorser_username TEXT NOT NULL,
+      endorser_name TEXT NOT NULL,
+      target_type TEXT NOT NULL CHECK(target_type IN ('skill', 'project')),
+      target_id TEXT NOT NULL,
+      target_username TEXT,
+      skill_name TEXT,
+      project_id INTEGER,
+      rating INTEGER NOT NULL CHECK(rating >= 1 AND rating <= 5),
+      message TEXT NOT NULL,
+      trac_staked REAL NOT NULL DEFAULT 0,
+      ual TEXT UNIQUE,
+      dataset_root TEXT,
+      publish_status TEXT DEFAULT 'pending',
+      operation_id TEXT,
+      withdrawn_at DATETIME,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )
   `);
 
@@ -110,6 +138,38 @@ export const profileQueries = {
     );
   },
 
+  // Upsert profile from GitHub data
+  upsertFromGithub: (profileData) => {
+    const stmt = db.prepare(`
+      INSERT INTO profiles (
+        github_id, username, full_name, email, avatar_url, bio, location,
+        github_username, access_token, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+      ON CONFLICT(github_id) DO UPDATE SET
+        username = excluded.username,
+        full_name = excluded.full_name,
+        email = excluded.email,
+        avatar_url = excluded.avatar_url,
+        bio = COALESCE(excluded.bio, profiles.bio),
+        location = COALESCE(excluded.location, profiles.location),
+        github_username = excluded.github_username,
+        access_token = excluded.access_token,
+        updated_at = CURRENT_TIMESTAMP
+    `);
+
+    return stmt.run(
+      profileData.github_id,
+      profileData.username,
+      profileData.full_name,
+      profileData.email,
+      profileData.avatar_url,
+      profileData.bio,
+      profileData.location,
+      profileData.github_username,
+      profileData.access_token
+    );
+  },
+
   getById: (id) => {
     const stmt = db.prepare('SELECT * FROM profiles WHERE id = ?');
     return stmt.get(id);
@@ -118,6 +178,11 @@ export const profileQueries = {
   getByUsername: (username) => {
     const stmt = db.prepare('SELECT * FROM profiles WHERE username = ?');
     return stmt.get(username);
+  },
+
+  getByGithubId: (githubId) => {
+    const stmt = db.prepare('SELECT * FROM profiles WHERE github_id = ?');
+    return stmt.get(githubId);
   },
 
   getByUal: (ual) => {

@@ -61,6 +61,7 @@ export interface Profile {
     created_at: string;
     explorerUrl: string;
     reputation_score?: number; // Calculated reputation score
+    avatar_url?: string;
 }
 
 // Project Data
@@ -211,6 +212,24 @@ export interface GivenEndorsementsResponse {
     activeCount: number;
     totalStaked: number;
     endorsements: Endorsement[];
+}
+
+export interface AuthStatusResponse {
+    authenticated: boolean;
+    user?: Profile | null;
+}
+
+export interface AuthUserResponse {
+    success: boolean;
+    authenticated: boolean;
+    user?: Profile;
+    error?: string;
+}
+
+export interface LogoutResponse {
+    success: boolean;
+    message?: string;
+    error?: string;
 }
 
 // Error Response

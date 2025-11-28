@@ -11,6 +11,7 @@ import AddProject from './pages/AddProject';
 import Endorsements from './pages/Endorsements';
 import PublicProfile from './pages/PublicProfile';
 import RecruiterDashboard from './pages/RecruiterDashboard';
+import GitHubCallback from './pages/GitHubCallback';
 
 const App: React.FC = () => {
   return (
@@ -27,6 +28,7 @@ const App: React.FC = () => {
             <Route path="/dashboard/projects/add" element={<AddProject />} />
             <Route path="/dashboard/endorsements" element={<Endorsements />} />
             <Route path="/recruiter" element={<RecruiterDashboard />} />
+            <Route path="/auth/callback" element={<GitHubCallback />} />
             <Route path="/:username" element={<PublicProfile />} />
           </Routes>
         </main>
