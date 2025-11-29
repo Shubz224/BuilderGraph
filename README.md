@@ -47,7 +47,7 @@ The tech hiring landscape is broken:
 
 We utilize a hybrid architecture combining the speed of Web2 with the trust of Web3.
 
-![BuilderGraph Banner](https://via.placeholder.com/1200x400?text=BuilderGraph+Decentralized+Reputation)
+![BuilderGraph Banner](./Architecture.webp)
 
 ---
 
@@ -238,7 +238,7 @@ docker run -p 8900:8900 -p 9000:9000 origintrail/ot-node:latest
 
 ## 📝 How It Works
 
-![BuilderGraph Architecture](../Architecture.webp)
+![BuilderGraph Architecture](../)
 <!-- ![BuilderGraph Architecture](../problem.jpg) -->
 
 ### 🎯 Complete User Journey
